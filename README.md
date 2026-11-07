@@ -1,8 +1,20 @@
+<div align="center">
+
 # tasks manager
 
-Obsidian 插件。把散落在日记里的 checkbox 待办，聚合成一个快捷键就能唤出的面板。
+把日记里散落的 checkbox 待办，聚合成一个快捷键就能唤出的面板
 
-An Obsidian plugin that gathers the checkbox todos scattered across your daily notes into one panel.
+[English](#english) &nbsp;|&nbsp; [中文](#中文)
+
+[![License](https://img.shields.io/badge/license-MIT-2ea44f?style=flat-square)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.1.0-4c6ef5?style=flat-square)](https://github.com/Ricardo-SE/obsidian-tasks-manager/releases)
+[![Obsidian](https://img.shields.io/badge/Obsidian-1.4%2B-7C3AED?style=flat-square)](https://obsidian.md)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square)](https://www.typescriptlang.org/)
+
+</div>
+
+<!-- 截图：把真机截的面板图存成 panel.png 放到仓库根目录，然后取消下面这行的注释 -->
+<!-- ![panel](panel.png) -->
 
 ---
 
@@ -10,13 +22,15 @@ An Obsidian plugin that gathers the checkbox todos scattered across your daily n
 
 ### 它解决什么
 
-日记是按时间流写的，待办也跟着散在每一天里。想还之前欠下的账，得一篇一篇往回翻。
+日记是按时间写的，待办也跟着散在每一天里。想还之前欠下的账，得一篇一篇往回翻。
 
 这个插件把 `YYYY-MM-DD.md` 里所有未勾的待办收拢到一个面板，分三段：
 
-- **今天** —— 今天日记里没做完的，日程和一次性都在
-- **之前** —— 更早没做完的，按从新到老排，标题显示「N 条 · 最老 X 天」
-- **今天已完成** —— 今天勾掉的，包括在面板上还的历史账
+| 区块 | 内容 |
+|---|---|
+| **今天** | 今天日记里没做完的，日程和一次性都在 |
+| **之前** | 更早没做完的，从新到老排，标题显示「N 条 · 最老 X 天」 |
+| **今天已完成** | 今天勾掉的，包括在面板上还的历史账 |
 
 面板上可以直接勾。勾之前的账，只改源笔记里那一个字符，另外往 `待办溯源/完成记录.md` 记一行完成日期。
 
@@ -79,15 +93,25 @@ node tests/preview.mjs    # 生成 preview.html 看面板长什么样
 
 测试数据在 `tests/fixtures/vault`，是合成的 mock 库，不含任何真实笔记。
 
+<div align="right"><a href="#tasks-manager">↑ 回到顶部</a></div>
+
 ---
 
 ## English
 
-### What it does
+### Why
 
-Your daily notes are a timeline, so todos end up scattered across dozens of files. This plugin collects every unchecked `- [ ]` from `YYYY-MM-DD.md` notes into one panel with three sections: **Today**, **Earlier** (unfinished items from previous days, newest first), and **Done today**.
+Daily notes are a timeline, so todos end up scattered across dozens of files. Digging back through them just to tick off an old item is the whole problem.
 
-You can check items straight from the panel. Checking an old item only flips one character in the source note, and appends a line to `待办溯源/完成记录.md` recording when it was actually completed.
+This plugin collects every unchecked `- [ ]` from `YYYY-MM-DD.md` notes into one panel:
+
+| Section | What's in it |
+|---|---|
+| **Today** | Unfinished items in today's note, both daily and one-off |
+| **Earlier** | Unfinished one-offs from previous days, newest first |
+| **Done today** | Everything checked today, including old items paid off from the panel |
+
+Checking an old item flips one character in the source note and appends a line to `待办溯源/完成记录.md` recording when it was actually completed.
 
 ### Install
 
@@ -108,10 +132,13 @@ npm run build
 
 ### Usage
 
-- `Ctrl+Shift+K` or the command palette to open the panel
-- Ribbon icon on mobile
-- Click a checkbox to complete a task, click the text to jump to the source line
-- Click `×` to cancel a task (writes `- [-]`)
+| Action | How |
+|---|---|
+| Open panel | `Ctrl+Shift+K`, or the command palette |
+| Mobile | Ribbon icon at the bottom right |
+| Complete | Click the checkbox |
+| Cancel (drop) | Click the `×`, writes `- [-]` |
+| Jump to source | Click the task text |
 
 ### Conventions
 
@@ -135,6 +162,20 @@ Same text appearing on 3 or more distinct dates is also treated as a daily item 
 - **The parser never imports the Obsidian API**, so it can be tested in plain node.
 - **Minimal writes.** Checking a task flips one character; only cross-day completions add a record line, one per task at most.
 
+### Tests
+
+```bash
+npm test                  # parser and grouping assertions
+node tests/smoke.mjs      # bundle loaded against a fake Obsidian
+node tests/preview.mjs    # renders preview.html
+```
+
+Fixtures live in `tests/fixtures/vault` — a synthetic mock vault, no real notes.
+
+<div align="right"><a href="#tasks-manager">↑ Back to top</a></div>
+
+---
+
 ## License
 
-MIT
+MIT © [Ricardo](https://github.com/Ricardo-SE)
