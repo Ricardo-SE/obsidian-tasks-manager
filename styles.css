@@ -1,0 +1,211 @@
+/* tasks manager 面板样式
+   只用 Obsidian 自带的 CSS 变量，跟随主题明暗 */
+
+.tm-panel {
+  padding: 8px 6px 32px;
+}
+
+/* ---------- 区块头 ---------- */
+
+.tm-sec {
+  margin-bottom: 6px;
+}
+
+.tm-sec-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 6px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+details > summary.tm-sec-head {
+  cursor: pointer;
+  list-style: none;
+}
+
+details > summary.tm-sec-head::-webkit-details-marker {
+  display: none;
+}
+
+details > summary.tm-sec-head::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 4px solid var(--text-faint);
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  transition: transform 0.12s ease;
+  flex: 0 0 auto;
+}
+
+details[open] > summary.tm-sec-head::before {
+  transform: rotate(90deg);
+}
+
+.tm-count {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+/* ---------- 行 ---------- */
+
+.tm-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.tm-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  line-height: 1.5;
+}
+
+.tm-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+/* 勾选框 */
+.tm-check {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin: 3px 0 0;
+  padding: 0;
+  border: 1.5px solid var(--text-faint);
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  position: relative;
+}
+
+.tm-check:hover {
+  border-color: var(--interactive-accent);
+}
+
+.tm-row.is-done .tm-check {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+}
+
+.tm-row.is-done .tm-check::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 0px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--text-on-accent);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+/* 文本 */
+.tm-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--text-normal);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.tm-text:hover {
+  color: var(--text-accent);
+}
+
+.tm-row.is-done .tm-text {
+  color: var(--text-faint);
+  text-decoration: line-through;
+  text-decoration-color: var(--text-faint);
+}
+
+.tm-row.is-done .tm-text:hover {
+  color: var(--text-muted);
+}
+
+/* 右侧日期 */
+.tm-meta {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 划掉按钮 */
+.tm-cancel {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.tm-row:hover .tm-cancel {
+  opacity: 0.7;
+}
+
+.tm-cancel:hover {
+  opacity: 1;
+  color: var(--text-error);
+  background: var(--background-modifier-hover);
+}
+
+/* 手机上没有 hover，划掉按钮常显 */
+body.is-mobile .tm-cancel {
+  opacity: 0.5;
+}
+
+/* ---------- 更早 / 空状态 ---------- */
+
+.tm-more {
+  margin: 2px 0 0 6px;
+}
+
+.tm-more > summary {
+  padding: 5px 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.tm-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.tm-more > summary:hover {
+  color: var(--text-normal);
+}
+
+.tm-empty {
+  padding: 6px 8px 8px;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}

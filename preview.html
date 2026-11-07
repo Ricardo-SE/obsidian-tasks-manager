@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>tasks manager · 面板预览</title>
+<style>
+:root {
+  --background-primary: #ffffff;
+  --background-secondary: #f7f7f5;
+  --background-modifier-hover: rgba(0, 0, 0, 0.055);
+  --text-normal: #24292f;
+  --text-muted: #6b7280;
+  --text-faint: #9aa2ad;
+  --text-accent: #5b5bd6;
+  --text-error: #d1242f;
+  --text-on-accent: #ffffff;
+  --interactive-accent: #5b5bd6;
+  --color-border: rgba(0, 0, 0, 0.09);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background-primary: #1e1e1e;
+    --background-secondary: #252525;
+    --background-modifier-hover: rgba(255, 255, 255, 0.07);
+    --text-normal: #dadada;
+    --text-muted: #9e9e9e;
+    --text-faint: #6f6f6f;
+    --text-accent: #a5a5ff;
+    --text-error: #ff6b6b;
+    --text-on-accent: #ffffff;
+    --interactive-accent: #7b6cff;
+    --color-border: rgba(255, 255, 255, 0.1);
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 48px 24px;
+  background: var(--background-secondary);
+  font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--text-normal);
+  display: flex;
+  justify-content: center;
+}
+.stage { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
+.window {
+  width: 320px;
+  background: var(--background-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+}
+.win-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--background-primary);
+}
+.win-dots { display: flex; gap: 5px; }
+.win-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--text-faint); opacity: .45; display: block; }
+.win-title { font-size: 12px; color: var(--text-muted); margin-left: 4px; }
+.hint { max-width: 300px; font-size: 13px; line-height: 1.75; color: var(--text-muted); }
+.hint h1 { font-size: 15px; font-weight: 500; margin: 0 0 12px; color: var(--text-normal); }
+.hint p { margin: 0 0 10px; }
+.hint code { font-size: 12px; background: var(--background-modifier-hover); padding: 1px 5px; border-radius: 4px; }
+/* tasks manager 面板样式
+   只用 Obsidian 自带的 CSS 变量，跟随主题明暗 */
+
+.tm-panel {
+  padding: 8px 6px 32px;
+}
+
+/* ---------- 区块头 ---------- */
+
+.tm-sec {
+  margin-bottom: 6px;
+}
+
+.tm-sec-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 6px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+details > summary.tm-sec-head {
+  cursor: pointer;
+  list-style: none;
+}
+
+details > summary.tm-sec-head::-webkit-details-marker {
+  display: none;
+}
+
+details > summary.tm-sec-head::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 4px solid var(--text-faint);
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  transition: transform 0.12s ease;
+  flex: 0 0 auto;
+}
+
+details[open] > summary.tm-sec-head::before {
+  transform: rotate(90deg);
+}
+
+.tm-count {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+/* ---------- 行 ---------- */
+
+.tm-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.tm-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  line-height: 1.5;
+}
+
+.tm-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+/* 勾选框 */
+.tm-check {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin: 3px 0 0;
+  padding: 0;
+  border: 1.5px solid var(--text-faint);
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  position: relative;
+}
+
+.tm-check:hover {
+  border-color: var(--interactive-accent);
+}
+
+.tm-row.is-done .tm-check {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+}
+
+.tm-row.is-done .tm-check::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 0px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--text-on-accent);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+/* 文本 */
+.tm-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--text-normal);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.tm-text:hover {
+  color: var(--text-accent);
+}
+
+.tm-row.is-done .tm-text {
+  color: var(--text-faint);
+  text-decoration: line-through;
+  text-decoration-color: var(--text-faint);
+}
+
+.tm-row.is-done .tm-text:hover {
+  color: var(--text-muted);
+}
+
+/* 右侧日期 */
+.tm-meta {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 划掉按钮 */
+.tm-cancel {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-faint);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.tm-row:hover .tm-cancel {
+  opacity: 0.7;
+}
+
+.tm-cancel:hover {
+  opacity: 1;
+  color: var(--text-error);
+  background: var(--background-modifier-hover);
+}
+
+/* 手机上没有 hover，划掉按钮常显 */
+body.is-mobile .tm-cancel {
+  opacity: 0.5;
+}
+
+/* ---------- 更早 / 空状态 ---------- */
+
+.tm-more {
+  margin: 2px 0 0 6px;
+}
+
+.tm-more > summary {
+  padding: 5px 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.tm-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.tm-more > summary:hover {
+  color: var(--text-normal);
+}
+
+.tm-empty {
+  padding: 6px 8px 8px;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.tm-panel { padding: 8px 6px 20px; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="window">
+    <div class="win-bar">
+      <div class="win-dots"><i></i><i></i><i></i></div>
+      <div class="win-title">tasks manager</div>
+    </div>
+    <div class="tm-panel">
+      <div class="tm-sec">
+  <div class="tm-sec-head"><span class="tm-sec-title">今天</span><span class="tm-count">5</span></div>
+  <div class="tm-list"><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">写周报</span>
+    
+    
+  </div><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">买菜 &amp; 拿快递</span>
+    
+    
+  </div><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">研究 R&amp;D 方案</span>
+    
+    
+  </div><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">整理书架</span>
+    
+    
+  </div><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">背单词</span>
+    
+    
+  </div></div>
+</div>
+      <details class="tm-sec" open>
+    <summary class="tm-sec-head"><span class="tm-sec-title">之前 · 9 条 · 最老 4 天</span><span class="tm-count">9</span></summary>
+    <div class="tm-list"><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">嵌套的一条</span>
+    <span class="tm-meta">11-05</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">复习</span>
+    <span class="tm-meta">11-05</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">复习</span>
+    <span class="tm-meta">11-05</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">整理旧文档</span>
+    <span class="tm-meta">11-05</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">把学习计划理一理</span>
+    <span class="tm-meta">11-05</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">整理桌面</span>
+    <span class="tm-meta">11-05</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">想个账号名字</span>
+    <span class="tm-meta">11-03</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">换季衣物整理</span>
+    <span class="tm-meta">11-03</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">学一点修图</span>
+    <span class="tm-meta">11-03</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div><details class="tm-more"><summary class="tm-more-head">更早 3 条</summary>
+     <div class="tm-list"><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">整理旧照片</span>
+    <span class="tm-meta">10-15</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">换手机</span>
+    <span class="tm-meta">10-15</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">很早的一条</span>
+    <span class="tm-meta">09-01</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div></div></details></div>
+  </details>
+      <details class="tm-sec">
+    <summary class="tm-sec-head"><span class="tm-sec-title">今天已完成</span><span class="tm-count">2</span></summary>
+    <div class="tm-list"><div class="tm-row is-done" data-state="done">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">做完原型</span>
+    <span class="tm-meta">11-03 → 11-07</span>
+    
+  </div><div class="tm-row is-done" data-state="done">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">晨间拉伸</span>
+    <span class="tm-meta">11 · 当天</span>
+    
+  </div></div>
+  </details>
+    </div>
+  </div>
+  <div class="hint">
+    <h1>这是真实渲染</h1>
+    <p>结构、类名、样式都来自插件本体，数据来自 mock 库（模拟今天是 2026-11-07）。</p>
+    <p>「之前」里的 11-05 是还没还的账，右边日期是记下的那天。点勾会走 <code>toggleTask</code>，跨天的会写一行到 <code>待办溯源/完成记录.md</code>。</p>
+    <p>折叠区可以真的点开，勾选框是视觉演示，不会写文件。</p>
+  </div>
+</div>
+<script>
+document.querySelectorAll('.tm-check').forEach((el) => {
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    el.parentElement.classList.toggle('is-done');
+  });
+});
+</script>
+</body>
+</html>
