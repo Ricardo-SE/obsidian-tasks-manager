@@ -130,6 +130,16 @@ export function extractReviewDue(raw: string): { text: string; due: string | nul
 }
 
 /**
+ * 取消一行的回顾标记：删掉行尾的 @日期
+ * 没有标记时返回 null
+ */
+export function unmarkLine(line: string): string | null {
+  const m = line.match(REVIEW_DATE_RE);
+  if (!m || m.index === undefined) return null;
+  return line.slice(0, m.index).trimEnd();
+}
+
+/**
  * 把一行标记成待回顾
  * 返回新的整行；这一行没法标记时返回 null
  *

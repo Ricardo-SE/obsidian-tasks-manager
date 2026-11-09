@@ -7,7 +7,7 @@
 [English](#english) &nbsp;|&nbsp; [中文](#中文)
 
 [![License](https://img.shields.io/badge/license-MIT-2ea44f?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.1-4c6ef5?style=flat-square)](https://github.com/Ricardo-SE/obsidian-tasks-manager/releases)
+[![Version](https://img.shields.io/badge/version-0.2.2-4c6ef5?style=flat-square)](https://github.com/Ricardo-SE/obsidian-tasks-manager/releases)
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.4%2B-7C3AED?style=flat-square)](https://obsidian.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square)](https://www.typescriptlang.org/)
 
@@ -102,6 +102,8 @@ npm run build
 4. 问你要不要再排一轮，选了就在同一段落下长出新的待回顾项
 
 模板里需要有 `### 今日回顾` 这个段落；没有的话插件会在文件末尾补一个。
+
+标错了要撤销，就在那一行再打一次 `@@`，列表末尾会多出一条「取消回顾标记」，选它就把日期删掉。桌面快捷键的弹窗里也有这一项。
 
 手机上同样是打 `@@` —— 不需要离开编辑器，所以没有 ribbon 图标。
 

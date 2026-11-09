@@ -4,6 +4,7 @@
  */
 import { Notice, Plugin, TFile, WorkspaceLeaf } from 'obsidian';
 import { EventBus } from './events.ts';
+import { unmarkLine } from './parser.ts';
 import { appendRow, formatRow, parseRecords, removeRows } from './record.ts';
 import {
   addDays,
@@ -27,6 +28,7 @@ import {
   readNotes,
   readRecord,
   readReviewRecord,
+  unmarkLineAt,
   writeRecord,
   writeReviewRecord,
 } from './vault-io.ts';
@@ -74,11 +76,17 @@ export default class TasksManagerPlugin extends Plugin {
       editorCallback: async (editor) => {
         // 先把行号记下来：弹窗关掉后光标位置可能已经变了
         const line = editor.getCursor().line;
+        const canRemove = unmarkLine(editor.getLine(line)) !== null;
 
-        const days = await pickDays(this.app, false);
-        if (days <= 0) return;
+        const choice = await pickDays(this.app, false, canRemove);
+        if (choice === 0) return;
 
-        const due = addDays(todayString(), days);
+        if (choice === -1) {
+          if (!unmarkLineAt(editor, line)) new Notice('tasks manager：这一行没有回顾标记');
+          return;
+        }
+
+        const due = addDays(todayString(), choice);
         if (!markLineAt(editor, line, due)) {
           new Notice('tasks manager：这一行不能标记（空行或标题）');
         }

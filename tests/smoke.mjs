@@ -112,9 +112,11 @@ class Modal {
         return;
       }
       const btns = collectButtons(this.contentEl);
-      const hit = btns.find((b) =>
-        choice === 0 ? b.text === '不再复习' : b.text.startsWith(`${choice} `),
-      );
+      const hit = btns.find((b) => {
+        if (choice === 0) return b.text === '不再复习';
+        if (choice === -1) return b.text === '取消回顾标记';
+        return b.text.startsWith(`${choice} `);
+      });
       if (hit) hit.handlers.click?.();
       else this.onClose?.();
     });
@@ -431,6 +433,21 @@ const fakeEditor2 = {
 pickQueue.push('close');
 await plugin.commands.find((c) => c.id === 'mark-review').editorCallback(fakeEditor2);
 check('关掉弹窗不标记', !fakeEditor2.lines[0].includes('@'));
+
+// 取消标记：弹窗里应该多出「取消回顾标记」
+const fakeEditor3 = {
+  lines: ['- [ ] 认知负荷理论 @2026-11-14'],
+  getCursor: () => ({ line: 0, ch: 0 }),
+  lineCount: () => 1,
+  getLine: () => fakeEditor3.lines[0],
+  setLine: (i, v) => {
+    fakeEditor3.lines[0] = v;
+  },
+  setCursor() {},
+};
+pickQueue.push(-1);
+await plugin.commands.find((c) => c.id === 'mark-review').editorCallback(fakeEditor3);
+check('取消标记去掉日期', fakeEditor3.lines[0] === '- [ ] 认知负荷理论', fakeEditor3.lines[0]);
 
 // —— 回顾的入口都注册了 ——
 check('注册了 @@ 触发器', plugin.suggests.length === 1);

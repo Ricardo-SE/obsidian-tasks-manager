@@ -12,6 +12,7 @@ import {
   setTaskStatus,
   stripRoutineMarker,
   textOfLine,
+  unmarkLine,
 } from '../src/parser.ts';
 import { appendRow, formatRow, parseRecords, RECORD_HEADER, removeRows } from '../src/record.ts';
 import {
@@ -170,6 +171,9 @@ check('重新标记覆盖旧日期',
   markLineWithDue('- [ ] 认知负荷 @2026-11-10', '2026-11-16') === '- [ ] 认知负荷 @2026-11-16');
 check('标题行不转', markLineWithDue('## 下午：', '2026-11-16') === null);
 check('空行不转', markLineWithDue('   ', '2026-11-16') === null);
+check('取消标记剥掉日期', unmarkLine('- [ ] 认知负荷 @2026-11-16') === '- [ ] 认知负荷');
+check('取消标记保留缩进', unmarkLine('  - [ ] 认知负荷 @2026-11-16') === '  - [ ] 认知负荷');
+check('没有日期时取消标记返回 null', unmarkLine('- [ ] 认知负荷') === null);
 
 // 日期换算
 check('加天数跨月', addDays('2026-11-28', 5) === '2026-12-03');

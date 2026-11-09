@@ -11,11 +11,12 @@ import type {
   EditorSuggestTriggerInfo,
   TFile,
 } from 'obsidian';
+import { extractReviewDue } from './parser.ts';
 import { addDays, REVIEW_DAYS } from './review.ts';
 import { todayString } from './store.ts';
-import { applyMarkWithRange } from './vault-io.ts';
+import { applyMarkWithRange, clearMarkAt } from './vault-io.ts';
 
-/** 一个候选项。days 为 0 表示「不再复习」 */
+/** 一个候选项。days 为 0 表示「不再复习」，-1 表示「取消标记」 */
 export interface DayOption {
   days: number;
   label: string;
@@ -61,10 +62,17 @@ export class ReviewSuggest extends EditorSuggest<DayOption> {
 
   getSuggestions(context: EditorSuggestContext): DayOption[] {
     const q = context.query.trim();
-    const all = REVIEW_DAYS.map((d) => ({ days: d, label: `${d} 天后回顾` }));
+    const all: DayOption[] = REVIEW_DAYS.map((d) => ({ days: d, label: `${d} 天后回顾` }));
+
+    // 这一行已经有回顾日期时，末尾多给一个「取消」。放最后，避免回车误选
+    const prefix = context.editor.getLine(context.start.line).slice(0, context.start.ch);
+    if (extractReviewDue(prefix).due) {
+      all.push({ days: -1, label: '取消回顾标记' });
+    }
+
     if (!q) return all;
 
-    const filtered = all.filter((o) => String(o.days).startsWith(q));
+    const filtered = all.filter((o) => String(o.days) === q || o.label.includes(q));
     const exact = filtered.find((o) => String(o.days) === q);
     return exact ? [exact] : filtered;
   }
@@ -76,6 +84,13 @@ export class ReviewSuggest extends EditorSuggest<DayOption> {
   selectSuggestion(item: DayOption): void {
     const ctx = this.context;
     if (!ctx) return;
+
+    if (item.days === -1) {
+      const ok = clearMarkAt(ctx.editor, ctx.start.line, ctx.start.ch, ctx.end.ch);
+      if (!ok) new Notice('tasks manager：这一行没有回顾标记');
+      this.close();
+      return;
+    }
 
     const due = addDays(todayString(), item.days);
     const ok = applyMarkWithRange(ctx.editor, ctx.start.line, ctx.start.ch, ctx.end.ch, due);
@@ -93,6 +108,7 @@ export class DayPickerModal extends Modal {
     app: App,
     private readonly resolve: (days: number) => void,
     private readonly allowNone: boolean,
+    private readonly canRemove: boolean,
   ) {
     super(app);
   }
@@ -106,10 +122,11 @@ export class DayPickerModal extends Modal {
     const list = contentEl.createEl('div', { cls: 'tm-day-list' });
     const options: DayOption[] = REVIEW_DAYS.map((d) => ({ days: d, label: `${d} 天后回顾` }));
     if (this.allowNone) options.unshift({ days: 0, label: '不再复习' });
+    if (this.canRemove) options.push({ days: -1, label: '取消回顾标记' });
 
     for (const opt of options) {
       const btn = list.createEl('button', { cls: 'tm-day-btn', text: opt.label });
-      if (opt.days === 0) btn.addClass('is-none');
+      if (opt.days <= 0) btn.addClass('is-none');
       btn.addEventListener('click', () => {
         this.finish(opt.days);
         this.close();
@@ -129,9 +146,9 @@ export class DayPickerModal extends Modal {
   }
 }
 
-/** 打开天数选择框，返回 Promise */
-export function pickDays(app: App, allowNone: boolean): Promise<number> {
+/** 打开天数选择框。返回值：天数 >0，0 = 取消/不再，-1 = 取消标记 */
+export function pickDays(app: App, allowNone: boolean, canRemove = false): Promise<number> {
   return new Promise((resolve) => {
-    new DayPickerModal(app, resolve, allowNone).open();
+    new DayPickerModal(app, resolve, allowNone, canRemove).open();
   });
 }

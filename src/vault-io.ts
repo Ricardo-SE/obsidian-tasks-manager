@@ -3,7 +3,7 @@
  * 唯一一处 import obsidian 的数据侧代码，所有碰磁盘的动作都收在这里
  */
 import { App, Editor, MarkdownView, TFile } from 'obsidian';
-import { diaryDateOf, markLineWithDue, setTaskStatus, textOfLine } from './parser.ts';
+import { diaryDateOf, markLineWithDue, setTaskStatus, textOfLine, unmarkLine } from './parser.ts';
 import { appendToSection } from './review.ts';
 import type { RawNote, Task, TaskStatus } from './types.ts';
 
@@ -232,6 +232,31 @@ export function markLineAt(editor: Editor, line: number, dueDate: string): boole
   if (!updated) return false;
   editor.setLine(line, updated);
   editor.setCursor({ line, ch: updated.length });
+  return true;
+}
+
+/** 取消编辑器某一行上的回顾标记 */
+export function unmarkLineAt(editor: Editor, line: number): boolean {
+  if (line < 0 || line >= editor.lineCount()) return false;
+  const next = unmarkLine(editor.getLine(line));
+  if (next === null) return false;
+  editor.setLine(line, next);
+  editor.setCursor({ line, ch: next.length });
+  return true;
+}
+
+/**
+ * 取消标记，同时把 `@@` 那一段删掉
+ * 用于 `@@` 触发后选择「取消回顾标记」
+ */
+export function clearMarkAt(editor: Editor, line: number, fromCh: number, toCh: number): boolean {
+  if (line < 0 || line >= editor.lineCount()) return false;
+  const raw = editor.getLine(line);
+  const cleaned = raw.slice(0, fromCh) + raw.slice(toCh);
+  const next = unmarkLine(cleaned);
+  if (next === null) return false;
+  editor.setLine(line, next);
+  editor.setCursor({ line, ch: next.length });
   return true;
 }
 
