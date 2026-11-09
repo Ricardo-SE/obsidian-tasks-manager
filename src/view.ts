@@ -70,27 +70,30 @@ export class TaskPanelView extends ItemView {
 
     // —— 待回顾 ——
     const reviewOpen = review.overdue.length + review.farOverdue.length + review.soon.length;
-    if (reviewOpen > 0) {
-      this.section(root, '待回顾', reviewOpen, null, (body) => {
-        const list = body.createEl('div', { cls: 'tm-list' });
-        for (const task of review.overdue) this.row(list, task, 'review');
-        for (const task of review.soon) this.row(list, task, 'review');
+    this.section(root, '待回顾', reviewOpen, null, (body) => {
+      if (!reviewOpen) {
+        this.placeholder(body, '还没有标记的回顾项 · 在日记行尾打 @@');
+        return;
+      }
 
-        if (review.farOverdue.length) {
-          const more = body.createEl('details', { cls: 'tm-more' });
-          more.open = this.state.farOverdue;
-          more.addEventListener('toggle', () => {
-            this.state.farOverdue = more.open;
-          });
-          more.createEl('summary', {
-            cls: 'tm-more-head',
-            text: `逾期 30 天以上 ${review.farOverdue.length} 条`,
-          });
-          const farList = more.createEl('div', { cls: 'tm-list' });
-          for (const task of review.farOverdue) this.row(farList, task, 'review');
-        }
-      });
-    }
+      const list = body.createEl('div', { cls: 'tm-list' });
+      for (const task of review.overdue) this.row(list, task, 'review');
+      for (const task of review.soon) this.row(list, task, 'review');
+
+      if (review.farOverdue.length) {
+        const more = body.createEl('details', { cls: 'tm-more' });
+        more.open = this.state.farOverdue;
+        more.addEventListener('toggle', () => {
+          this.state.farOverdue = more.open;
+        });
+        more.createEl('summary', {
+          cls: 'tm-more-head',
+          text: `逾期 30 天以上 ${review.farOverdue.length} 条`,
+        });
+        const farList = more.createEl('div', { cls: 'tm-list' });
+        for (const task of review.farOverdue) this.row(farList, task, 'review');
+      }
+    });
 
     // —— 之前 ——
     const prevTitle = previous.length ? `之前 · ${previous.length} 条 · 最老 ${oldestDays} 天` : '之前';
