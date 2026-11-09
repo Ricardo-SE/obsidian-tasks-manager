@@ -213,6 +213,11 @@ details[open] > summary.tm-sec-head::before {
   white-space: nowrap;
 }
 
+/* 逾期的回顾项 */
+.tm-meta-warn {
+  color: var(--text-error);
+}
+
 /* 划掉按钮 */
 .tm-cancel {
   appearance: none;
@@ -289,8 +294,13 @@ body.is-mobile .tm-cancel {
     </div>
     <div class="tm-panel">
       <div class="tm-sec">
-  <div class="tm-sec-head"><span class="tm-sec-title">今天</span><span class="tm-count">5</span></div>
+  <div class="tm-sec-head"><span class="tm-sec-title">今天</span><span class="tm-count">6</span></div>
   <div class="tm-list"><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">认知负荷理论：工作记忆容量有限</span>
+    
+    
+  </div><div class="tm-row" data-state="todo">
     <button class="tm-check" aria-label="勾选"></button>
     <span class="tm-text">写周报</span>
     
@@ -316,6 +326,27 @@ body.is-mobile .tm-cancel {
     
     
   </div></div>
+</div>
+      <div class="tm-sec">
+  <div class="tm-sec-head"><span class="tm-sec-title">待回顾</span><span class="tm-count">3</span></div>
+  <div class="tm-list"><div class="tm-row is-overdue" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">间隔重复：复习间隔递增</span>
+    <span class="tm-meta tm-meta-warn">逾期 3 天</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">双链笔记：反向链接</span>
+    <span class="tm-meta">11-09</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div></div>
+  <details class="tm-more"><summary class="tm-more-head">逾期 30 天以上 1 条</summary>
+     <div class="tm-list"><div class="tm-row is-overdue" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">很老的一条</span>
+    <span class="tm-meta tm-meta-warn">逾期 67 天</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div></div></details>
 </div>
       <details class="tm-sec" open>
     <summary class="tm-sec-head"><span class="tm-sec-title">之前 · 9 条 · 最老 4 天</span><span class="tm-count">9</span></summary>
@@ -383,11 +414,16 @@ body.is-mobile .tm-cancel {
   </div></div></details></div>
   </details>
       <details class="tm-sec">
-    <summary class="tm-sec-head"><span class="tm-sec-title">今天已完成</span><span class="tm-count">2</span></summary>
+    <summary class="tm-sec-head"><span class="tm-sec-title">今天已完成</span><span class="tm-count">3</span></summary>
     <div class="tm-list"><div class="tm-row is-done" data-state="done">
     <button class="tm-check" aria-label="勾选"></button>
     <span class="tm-text">做完原型</span>
     <span class="tm-meta">11-03 → 11-07</span>
+    
+  </div><div class="tm-row is-done" data-state="done">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">记忆曲线：艾宾浩斯</span>
+    <span class="tm-meta">11-05 → 11-07</span>
     
   </div><div class="tm-row is-done" data-state="done">
     <button class="tm-check" aria-label="勾选"></button>
@@ -401,7 +437,8 @@ body.is-mobile .tm-cancel {
   <div class="hint">
     <h1>这是真实渲染</h1>
     <p>结构、类名、样式都来自插件本体，数据来自 mock 库（模拟今天是 2026-11-07）。</p>
-    <p>「之前」里的 11-05 是还没还的账，右边日期是记下的那天。点勾会走 <code>toggleTask</code>，跨天的会写一行到 <code>待办溯源/完成记录.md</code>。</p>
+    <p>「之前」里的 11-05 是还没还的账，右边日期是记下的那天。「待回顾」里逾期的是学习回顾的欠账，逾期天数直接写在右边。</p>
+    <p>点勾会走 <code>toggleTask</code>：普通待办跨天完成会写一行到 <code>待办溯源/完成记录.md</code>；回顾项会写 <code>回顾记录.md</code>，并往当天日记的 <code>### 今日回顾</code> 段落追加留痕。</p>
     <p>折叠区可以真的点开，勾选框是视觉演示，不会写文件。</p>
   </div>
 </div>

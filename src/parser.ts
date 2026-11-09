@@ -19,6 +19,9 @@ export const TASK_LINE_RE = /^(\s*(?:>\s*)*)- \[([ xX-])\] (.*)$/;
 /** 行尾的 & 标记：& 前必须有空白，& 之后到行尾只能是空白 */
 const ROUTINE_TAIL_RE = /^(.*?)\s&\s*$/;
 
+/** 行尾的回顾日期：@2026-11-16，前面必须有空白 */
+const REVIEW_DATE_RE = /\s@(\d{4}-\d{2}-\d{2})\s*$/;
+
 /** 横线/波浪线围栏，用于跳过代码块 */
 const FENCE_RE = /^\s*(```|~~~)/;
 
@@ -94,21 +97,66 @@ export function parseDiary(content: string, sourcePath: string, sourceDate: stri
     const raw = m[3];
     if (raw.trim() === '') continue; // 空 checkbox 直接跳过
 
-    const { text, isRoutine } = stripRoutineMarker(raw);
+    // 先剥行尾回顾日期，再看 & 标记：有 @ 的一律是回顾项，& 不生效
+    const { text: withoutDue, due } = extractReviewDue(raw);
+    const routine = stripRoutineMarker(withoutDue);
+    if (routine.text === '') continue;
 
     tasks.push({
-      text,
+      text: routine.text,
       status: toStatus(m[2]),
-      isRoutine,
+      isRoutine: due ? false : routine.isRoutine,
       sourceDate,
       sourcePath,
       line: i + 1,
       doneDate: sourceDate, // 先填生成日期，done 记录在索引层覆盖
       daysAgo: 0,
+      reviewDue: due ?? undefined,
     });
   }
 
   return tasks;
+}
+
+/**
+ * 剥离行尾回顾日期
+ * 「认知负荷理论 @2026-11-16」 → { text: '认知负荷理论', due: '2026-11-16' }
+ * 「写成X@2026-11-16」没有空格 → 不算日期标记
+ */
+export function extractReviewDue(raw: string): { text: string; due: string | null } {
+  const m = raw.match(REVIEW_DATE_RE);
+  if (!m || m.index === undefined) return { text: raw, due: null };
+  return { text: raw.slice(0, m.index).trimEnd(), due: m[1] };
+}
+
+/**
+ * 把一行标记成待回顾
+ * 返回新的整行；这一行没法标记时返回 null
+ *
+ * - 已经是 checkbox：保留前缀与状态位，行尾追加日期
+ * - 普通文本：加上 "- [ ] " 前缀（保留缩进）
+ * - 标题行、空行：拒绝
+ */
+export function markLineWithDue(line: string, dueDate: string): string | null {
+  const stripped = line.replace(/\s+@\d{4}-\d{2}-\d{2}\s*$/, '');
+
+  const asTask = stripped.match(TASK_LINE_RE);
+  if (asTask) {
+    const body = asTask[3].replace(/\s+$/, '');
+    if (!body) return null;
+    return `${asTask[1]}- [${asTask[2]}] ${body} @${dueDate}`;
+  }
+
+  const plain = stripped.match(/^(\s*(?:>\s*)*)(.*)$/);
+  if (!plain) return null;
+
+  const prefix = plain[1];
+  const body = plain[2].trim();
+  if (!body) return null;
+  if (body.startsWith('#')) return null; // 标题行不转
+  if (/^[-*_]{3,}$/.test(body)) return null; // 分隔线不转
+
+  return `${prefix}- [ ] ${body} @${dueDate}`;
 }
 
 /**

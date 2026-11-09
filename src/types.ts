@@ -23,6 +23,8 @@ export interface Task {
   doneDate: string;
   /** 距离今天多少天 */
   daysAgo: number;
+  /** 回顾日期 YYYY-MM-DD。有值即为回顾项，进「待回顾」，永不进「之前」 */
+  reviewDue?: string;
 }
 
 /** 从磁盘读进来的一份原始笔记 */
@@ -31,10 +33,22 @@ export interface RawNote {
   content: string;
 }
 
-/** 面板的三段内容 */
+/** 「待回顾」区的三堆 */
+export interface ReviewGroups {
+  /** 逾期，但在折叠阈值内 */
+  overdue: Task[];
+  /** 逾期超过阈值，折叠起来 */
+  farOverdue: Task[];
+  /** 未来几天内到期 */
+  soon: Task[];
+}
+
+/** 面板的各段内容 */
 export interface TaskGroups {
-  /** 今天未完成的，含日程与一次性 */
+  /** 今天未完成的：今天日记里的待办 + 今天到期的回顾项 */
   today: Task[];
+  /** 待回顾 */
+  review: ReviewGroups;
   /** 更早未完成的一次性待办，窗口内 */
   previous: Task[];
   /** 更早未完成的一次性待办，超出窗口 */

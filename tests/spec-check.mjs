@@ -6,12 +6,24 @@ import { fileURLToPath } from 'node:url';
 
 import {
   diaryDateOf,
+  extractReviewDue,
+  markLineWithDue,
   parseDiary,
   setTaskStatus,
   stripRoutineMarker,
   textOfLine,
 } from '../src/parser.ts';
 import { appendRow, formatRow, parseRecords, RECORD_HEADER, removeRows } from '../src/record.ts';
+import {
+  addDays,
+  appendReviewRow,
+  appendToSection,
+  formatReviewRow,
+  nextRound,
+  parseReviewRecords,
+  REVIEW_HEADER,
+  removeReviewRows,
+} from '../src/review.ts';
 import { buildIndex, dayDiff, PREVIOUS_WINDOW_DAYS } from '../src/store.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -38,8 +50,13 @@ const recordText = fs.existsSync(path.join(VAULT, RECORD_REL))
   ? fs.readFileSync(path.join(VAULT, RECORD_REL), 'utf8')
   : '';
 
-const index = buildIndex(notes, parseRecords(recordText), TODAY);
-const { today, previous, older, todayDone, oldestDays } = index.groups;
+const reviewText = fs.existsSync(path.join(VAULT, '待办溯源/回顾记录.md'))
+  ? fs.readFileSync(path.join(VAULT, '待办溯源/回顾记录.md'), 'utf8')
+  : '';
+
+const reviewBook = parseReviewRecords(reviewText);
+const index = buildIndex(notes, parseRecords(recordText), TODAY, reviewBook);
+const { today, previous, older, todayDone, oldestDays, review } = index.groups;
 const byText = (s) => index.tasks.filter((t) => t.text === s);
 
 // ---------- 输出 ----------
@@ -48,7 +65,15 @@ line('=== mock 库 ===');
 line(`文件 ${allFiles.length} 个 · 日记 ${notes.length} 篇 · 待办 ${index.tasks.length} 条`);
 line();
 line(`=== 今天（${TODAY}）${today.length} 条 ===`);
-for (const t of today) line(`  [${t.isRoutine ? '日程' : '一次'}] ${t.text}`);
+for (const t of today) {
+  const tag = t.reviewDue ? `回顾 ${t.reviewDue.slice(5)}` : t.isRoutine ? '日程' : '一次';
+  line(`  [${tag}] ${t.text}`);
+}
+line();
+line(`=== 待回顾：逾期 ${review.overdue.length} · 折叠 ${review.farOverdue.length} · ${'未来'} ${review.soon.length} ===`);
+for (const t of review.overdue) line(`  逾期 ${dayDiff(t.reviewDue, TODAY)} 天  ${t.text}`);
+for (const t of review.soon) line(`  ${t.reviewDue.slice(5)} 到期  ${t.text}`);
+for (const t of review.farOverdue) line(`  逾期 ${dayDiff(t.reviewDue, TODAY)} 天（折叠）  ${t.text}`);
 line();
 line(`=== 之前 ${previous.length} 条 · 最老 ${oldestDays} 天 ===`);
 for (const t of previous) line(`  ${t.sourceDate.slice(5)}  ${t.text}`);
@@ -94,7 +119,7 @@ check('跨 2 天不判日程', byText('整理桌面').every((t) => !t.isRoutine)
 // 分组
 check('今天段条目正确',
   JSON.stringify(today.map((t) => t.text)) ===
-    JSON.stringify(['写周报', '买菜 & 拿快递', '研究 R&D 方案', '整理书架', '背单词']),
+    JSON.stringify(['认知负荷理论：工作记忆容量有限', '写周报', '买菜 & 拿快递', '研究 R&D 方案', '整理书架', '背单词']),
   today.map((t) => t.text).join(' / '));
 check('日程不进「之前」', !previous.some((t) => t.text === '维生素'));
 check('之前段 9 条', previous.length === 9, `实际 ${previous.length}`);
@@ -109,6 +134,80 @@ check('今天完成含当天勾的', todayDone.some((t) => t.text === '晨间拉
 check('今天完成含跨天还的账', todayDone.some((t) => t.text === '做完原型'));
 check('无记录时 done 退化为生成日期',
   index.tasks.find((t) => t.text === '维生素' && t.sourceDate === '2026-11-03')?.doneDate === '2026-11-03');
+check('今天已完成 3 条', todayDone.length === 3, `实际 ${todayDone.length}`);
+
+// ---------- 学习回顾 ----------
+check('回顾日期从文本里剥离', byText('认知负荷理论：工作记忆容量有限').length === 1);
+check('回顾项的 reviewDue 存在', byText('认知负荷理论：工作记忆容量有限')[0]?.reviewDue === '2026-11-07');
+check('回顾项永不进「之前」', !previous.some((t) => t.reviewDue));
+check('今天到期进「今天」', today.some((t) => t.text === '认知负荷理论：工作记忆容量有限'));
+check('逾期进待回顾', review.overdue.some((t) => t.text === '间隔重复：复习间隔递增'));
+check('未来 3 天内进待回顾', review.soon.some((t) => t.text === '双链笔记：反向链接'));
+check('远期不显示', ![...today, ...review.overdue, ...review.soon, ...previous]
+  .some((t) => t.text === '远期的一条'));
+check('逾期 30 天以上折叠', review.farOverdue.some((t) => t.text === '很老的一条'));
+check('回顾项不被自动判日程',
+  byText('重复知识').length === 3 && byText('重复知识').every((t) => !t.isRoutine && !!t.reviewDue));
+check('回顾项的 done 来自回顾记录',
+  index.tasks.find((t) => t.text === '记忆曲线：艾宾浩斯')?.doneDate === '2026-11-07');
+check('回顾项进了今天已完成', todayDone.some((t) => t.text === '记忆曲线：艾宾浩斯'));
+check('过期回顾记录不复活未完成项',
+  review.overdue.some((t) => t.text === '间隔重复：复习间隔递增'));
+
+// 回顾日期解析
+check('extractReviewDue 剥离正确',
+  JSON.stringify(extractReviewDue('认知负荷 @2026-11-16')) ===
+    JSON.stringify({ text: '认知负荷', due: '2026-11-16' }));
+check('无空格不认作日期', extractReviewDue('写成X@2026-11-16').due === null);
+check('中间出现不算', extractReviewDue('A @2026-11-16 B').due === null);
+
+// 标记成待回顾
+check('散文转成待办', markLineWithDue('认知负荷理论', '2026-11-16') === '- [ ] 认知负荷理论 @2026-11-16');
+check('已有 checkbox 只加日期',
+  markLineWithDue('- [ ] 认知负荷', '2026-11-16') === '- [ ] 认知负荷 @2026-11-16');
+check('缩进保留', markLineWithDue('  认知负荷', '2026-11-16') === '  - [ ] 认知负荷 @2026-11-16');
+check('重新标记覆盖旧日期',
+  markLineWithDue('- [ ] 认知负荷 @2026-11-10', '2026-11-16') === '- [ ] 认知负荷 @2026-11-16');
+check('标题行不转', markLineWithDue('## 下午：', '2026-11-16') === null);
+check('空行不转', markLineWithDue('   ', '2026-11-16') === null);
+
+// 日期换算
+check('加天数跨月', addDays('2026-11-28', 5) === '2026-12-03');
+check('加天数跨年', addDays('2026-12-30', 3) === '2027-01-02');
+
+// 回顾记录
+check('回顾记录解析', reviewBook.latestDone.get('记忆曲线：艾宾浩斯') === '2026-11-07');
+check('回顾轮次计算', nextRound(reviewBook, '记忆曲线：艾宾浩斯') === 2);
+check('新知识轮次从 1 开始', nextRound(reviewBook, '从没记过的知识') === 1);
+check('回顾记录行格式',
+  formatReviewRow('2026-11-16', '2026-11-09', '认知负荷', 1) === '| 2026-11-16 | 2026-11-09 | 认知负荷 | 1 |');
+check('回顾记录空文件补表头',
+  appendReviewRow('', '| 2026-11-16 | 2026-11-09 | 认知负荷 | 1 |').includes('| 复习日 |'));
+const dupReview = [REVIEW_HEADER,
+  '| 2026-11-16 | 2026-11-09 | 认知负荷 | 1 |',
+  '| 2026-11-16 | 2026-11-09 | 认知负荷 | 2 |'].join('\n');
+check('取消勾选删掉当天那条回顾记录',
+  !removeReviewRows(dupReview, '2026-11-16', '认知负荷').includes('认知负荷'));
+
+// 段落追加
+const baseNote = ['## 早上：', '- [ ] 写周报', '', '### 今日回顾', '- 复习：旧的一条', '', '## 收尾', '结尾'].join('\n');
+const appended = appendToSection(baseNote, '今日回顾', ['- 复习：新的（学于 11-09）']);
+check('追加进已有段落', appended.content.includes('- 复习：旧的一条\n- 复习：新的（学于 11-09）'));
+check('不破坏后面的标题', appended.content.includes('## 收尾'));
+check('段落存在时不算新建', appended.created === false);
+
+const emptySection = ['### 今日回顾', '', '## 收尾'].join('\n');
+check('空段落直接追加',
+  appendToSection(emptySection, '今日回顾', ['- 新的一行']).content.includes('### 今日回顾\n- 新的一行'));
+
+const noSection = ['## 早上：', '- [ ] 写周报'].join('\n');
+const created = appendToSection(noSection, '今日回顾', ['- 新的一行']);
+check('段落不存在时新建', created.created === true && created.content.includes('### 今日回顾'));
+check('新建段落带空行分隔', created.content.includes('写周报\n\n### 今日回顾'));
+
+const noSpaceHeading = ['###今日回顾', '- 旧的一条'].join('\n');
+check('无空格标题也能识别',
+  appendToSection(noSpaceHeading, '今日回顾', ['- 新的一条']).content.includes('- 旧的一条\n- 新的一条'));
 
 // 写回
 check('勾掉重构整行', setTaskStatus('- [ ] 买菜', 'todo', 'done') === '- [x] 买菜');

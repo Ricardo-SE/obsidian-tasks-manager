@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 
 import { diaryDateOf } from '../src/parser.ts';
 import { parseRecords } from '../src/record.ts';
-import { buildIndex } from '../src/store.ts';
+import { parseReviewRecords } from '../src/review.ts';
+import { buildIndex, dayDiff } from '../src/store.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -30,23 +31,36 @@ const notes = walk(VAULT)
 const recordPath = path.join(VAULT, RECORD_REL);
 const records = parseRecords(fs.existsSync(recordPath) ? fs.readFileSync(recordPath, 'utf8') : '');
 
-const { groups } = buildIndex(notes, records, TODAY);
+const reviewPath = path.join(VAULT, '待办溯源/回顾记录.md');
+const reviewBook = parseReviewRecords(
+  fs.existsSync(reviewPath) ? fs.readFileSync(reviewPath, 'utf8') : '',
+);
+
+const { groups } = buildIndex(notes, records, TODAY, reviewBook);
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 function row(t, where) {
-  const meta =
-    where === 'done'
-      ? t.doneDate === t.sourceDate
-        ? '11 · 当天'
-        : `${t.sourceDate.slice(5)} → ${t.doneDate.slice(5)}`
-      : where === 'previous'
-        ? t.sourceDate.slice(5)
-        : '';
-  const cancel = where === 'previous' ? '<button class="tm-cancel" aria-label="划掉">×</button>' : '';
-  return `<div class="tm-row${where === 'done' ? ' is-done' : ''}" data-state="${where === 'done' ? 'done' : 'todo'}">
+  let meta = '';
+  if (where === 'done') {
+    meta = t.doneDate === t.sourceDate ? '11 · 当天' : `${t.sourceDate.slice(5)} → ${t.doneDate.slice(5)}`;
+  } else if (where === 'review') {
+    const overdue = dayDiff(t.reviewDue, TODAY);
+    meta = overdue > 0 ? `逾期 ${overdue} 天` : t.reviewDue.slice(5);
+  } else if (where === 'previous') {
+    meta = t.sourceDate.slice(5);
+  }
+
+  const cancel =
+    where === 'previous' || where === 'review'
+      ? '<button class="tm-cancel" aria-label="划掉">×</button>'
+      : '';
+  const overdueClass = where === 'review' && dayDiff(t.reviewDue, TODAY) > 0 ? ' is-overdue' : '';
+  const metaClass = overdueClass ? 'tm-meta tm-meta-warn' : 'tm-meta';
+
+  return `<div class="tm-row${where === 'done' ? ' is-done' : ''}${overdueClass}" data-state="${where === 'done' ? 'done' : 'todo'}">
     <button class="tm-check" aria-label="勾选"></button>
     <span class="tm-text">${esc(t.text)}</span>
-    ${meta ? `<span class="tm-meta">${meta}</span>` : ''}
+    ${meta ? `<span class="${metaClass}">${meta}</span>` : ''}
     ${cancel}
   </div>`;
 }
@@ -62,6 +76,22 @@ const todayHtml = `<div class="tm-sec">
   <div class="tm-sec-head"><span class="tm-sec-title">今天</span><span class="tm-count">${groups.today.length}</span></div>
   <div class="tm-list">${groups.today.map((t) => row(t, 'today')).join('')}</div>
 </div>`;
+
+const reviewTotal =
+  groups.review.overdue.length + groups.review.farOverdue.length + groups.review.soon.length;
+
+const farHtml = groups.review.farOverdue.length
+  ? `<details class="tm-more"><summary class="tm-more-head">逾期 30 天以上 ${groups.review.farOverdue.length} 条</summary>
+     <div class="tm-list">${groups.review.farOverdue.map((t) => row(t, 'review')).join('')}</div></details>`
+  : '';
+
+const reviewHtml = reviewTotal
+  ? `<div class="tm-sec">
+  <div class="tm-sec-head"><span class="tm-sec-title">待回顾</span><span class="tm-count">${reviewTotal}</span></div>
+  <div class="tm-list">${[...groups.review.overdue, ...groups.review.soon].map((t) => row(t, 'review')).join('')}</div>
+  ${farHtml}
+</div>`
+  : '';
 
 const prevTitle = `之前 · ${groups.previous.length} 条 · 最老 ${groups.oldestDays} 天`;
 const olderHtml = groups.older.length
@@ -165,6 +195,7 @@ ${css}
     </div>
     <div class="tm-panel">
       ${todayHtml}
+      ${reviewHtml}
       ${prevHtml}
       ${doneHtml}
     </div>
@@ -172,7 +203,8 @@ ${css}
   <div class="hint">
     <h1>这是真实渲染</h1>
     <p>结构、类名、样式都来自插件本体，数据来自 mock 库（模拟今天是 2026-11-07）。</p>
-    <p>「之前」里的 11-05 是还没还的账，右边日期是记下的那天。点勾会走 <code>toggleTask</code>，跨天的会写一行到 <code>待办溯源/完成记录.md</code>。</p>
+    <p>「之前」里的 11-05 是还没还的账，右边日期是记下的那天。「待回顾」里逾期的是学习回顾的欠账，逾期天数直接写在右边。</p>
+    <p>点勾会走 <code>toggleTask</code>：普通待办跨天完成会写一行到 <code>待办溯源/完成记录.md</code>；回顾项会写 <code>回顾记录.md</code>，并往当天日记的 <code>### 今日回顾</code> 段落追加留痕。</p>
     <p>折叠区可以真的点开，勾选框是视觉演示，不会写文件。</p>
   </div>
 </div>

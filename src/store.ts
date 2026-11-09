@@ -1,11 +1,12 @@
 /**
  * 索引层
- * 输入：一堆原始笔记 + 记录映射 + 今天
- * 输出：全体待办 + 面板三段分组
+ * 输入：一堆原始笔记 + 待办完成记录 + 回顾记录 + 今天
+ * 输出：全体待办 + 面板各段分组
  * 纯函数，索引本身不落盘，随时可以从笔记重建
  */
 import { diaryDateOf, parseDiary } from './parser.ts';
 import { recordKey } from './record.ts';
+import { addDays, REVIEW_OVERDUE_FOLD_DAYS, REVIEW_SOON_DAYS, type ReviewBook } from './review.ts';
 import type { BuiltIndex, RawNote, Task, TaskGroups } from './types.ts';
 
 /** 「之前」默认只看最近这么多天 */
@@ -39,10 +40,11 @@ export function collectTasks(notes: RawNote[]): Task[] {
   return tasks;
 }
 
-/** 自动判日程：同一文本跨多少个不同日期出现过 */
+/** 自动判日程：同一文本跨多少个不同日期出现过。回顾项不参与统计 */
 function countDates(tasks: Task[]): Map<string, Set<string>> {
   const map = new Map<string, Set<string>>();
   for (const t of tasks) {
+    if (t.reviewDue) continue;
     let set = map.get(t.text);
     if (!set) {
       set = new Set<string>();
@@ -53,49 +55,81 @@ function countDates(tasks: Task[]): Map<string, Set<string>> {
   return map;
 }
 
-/**
- * 构建索引
- * records 的键是「生成日期|文本」，值是对应的 done 日期
- */
-export function buildIndex(notes: RawNote[], records: Map<string, string>, today: string): BuiltIndex {
+/** 空的回顾记录索引 */
+export function emptyReviewBook(): ReviewBook {
+  return { latestDone: new Map(), earliestLearned: new Map(), rounds: new Map() };
+}
+
+/** 构建索引 */
+export function buildIndex(
+  notes: RawNote[],
+  records: Map<string, string>,
+  today: string,
+  reviewBook: ReviewBook = emptyReviewBook(),
+): BuiltIndex {
   const tasks = collectTasks(notes);
 
-  // 第一遍：自动判日程
+  // 第一遍：自动判日程。回顾项不参与，否则复习几轮就会被误判成日程
   const dates = countDates(tasks);
   for (const t of tasks) {
+    if (t.reviewDue) continue;
     if (!t.isRoutine && (dates.get(t.text)?.size ?? 0) >= ROUTINE_DATE_THRESHOLD) {
       t.isRoutine = true;
     }
   }
 
-  // 第二遍：算 done 日期和天数差
+  // 第二遍：算 done 日期与天数差
   for (const t of tasks) {
     t.daysAgo = dayDiff(t.sourceDate, today);
-    // 记录只对已完成的待办生效；未完成时忽略，避免过期记录让待办凭空消失
-    const recorded = records.get(recordKey(t.sourceDate, t.text));
-    t.doneDate = t.status === 'done' && recorded ? recorded : t.sourceDate;
+
+    if (t.reviewDue) {
+      // 回顾项的完成日期来自回顾记录，不能退化成「学到的日子」
+      const recorded = reviewBook.latestDone.get(t.text);
+      t.doneDate = t.status === 'done' && recorded ? recorded : t.sourceDate;
+    } else {
+      // 待办的完成日期来自完成记录，只对已完成的生效
+      const recorded = records.get(recordKey(t.sourceDate, t.text));
+      t.doneDate = t.status === 'done' && recorded ? recorded : t.sourceDate;
+    }
   }
 
-  // 今天：日程和一次性都显示
-  const todayList = tasks
-    .filter((t) => t.sourceDate === today && t.status === 'todo')
-    .sort((a, b) => a.line - b.line);
+  const isReview = (t: Task) => !!t.reviewDue;
+  const openReview = tasks.filter((t) => t.status === 'todo' && isReview(t));
+  const soonLimit = addDays(today, REVIEW_SOON_DAYS);
 
-  // 之前：更早的、未完成的、非日程
+  // 今天：今天到期的回顾项 + 今天日记里的普通待办（回顾项排前面）
+  const dueToday = openReview.filter((t) => t.reviewDue === today).sort((a, b) => a.line - b.line);
+  const plainToday = tasks
+    .filter((t) => !isReview(t) && t.sourceDate === today && t.status === 'todo')
+    .sort((a, b) => a.line - b.line);
+  const todayList = [...dueToday, ...plainToday];
+
+  // 待回顾：逾期 + 未来几天内到期
+  const overdueAll = openReview
+    .filter((t) => (t.reviewDue as string) < today)
+    .sort((a, b) => ((a.reviewDue as string) < (b.reviewDue as string) ? -1 : 1));
+  const overdue = overdueAll.filter((t) => dayDiff(t.reviewDue as string, today) <= REVIEW_OVERDUE_FOLD_DAYS);
+  const farOverdue = overdueAll.filter((t) => dayDiff(t.reviewDue as string, today) > REVIEW_OVERDUE_FOLD_DAYS);
+  const soon = openReview
+    .filter((t) => (t.reviewDue as string) > today && (t.reviewDue as string) <= soonLimit)
+    .sort((a, b) => ((a.reviewDue as string) < (b.reviewDue as string) ? -1 : 1));
+
+  // 之前：更早的、未完成的一次性待办。回顾项永不进这里
   const previousAll = tasks
-    .filter((t) => t.sourceDate < today && t.status === 'todo' && !t.isRoutine)
+    .filter((t) => !isReview(t) && t.sourceDate < today && t.status === 'todo' && !t.isRoutine)
     .sort((a, b) => (a.sourceDate === b.sourceDate ? a.line - b.line : a.sourceDate < b.sourceDate ? 1 : -1));
 
   const previous = previousAll.filter((t) => t.daysAgo <= PREVIOUS_WINDOW_DAYS);
   const older = previousAll.filter((t) => t.daysAgo > PREVIOUS_WINDOW_DAYS);
 
-  // 今天已完成：done 日期就是今天（包含在面板上还的历史账）
+  // 今天已完成：done 日期就是今天，含面板上还的历史账、今天复习掉的知识
   const todayDone = tasks
     .filter((t) => t.status === 'done' && t.doneDate === today)
     .sort((a, b) => (a.sourceDate === b.sourceDate ? a.line - b.line : a.sourceDate < b.sourceDate ? -1 : 1));
 
   const groups: TaskGroups = {
     today: todayList,
+    review: { overdue, farOverdue, soon },
     previous,
     older,
     todayDone,

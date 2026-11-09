@@ -146,6 +146,11 @@ details[open] > summary.tm-sec-head::before {
   white-space: nowrap;
 }
 
+/* 逾期的回顾项 */
+.tm-meta-warn {
+  color: var(--text-error);
+}
+
 /* 划掉按钮 */
 .tm-cancel {
   appearance: none;

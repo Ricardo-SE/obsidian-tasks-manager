@@ -5,9 +5,31 @@
 import { Notice, Plugin, TFile, WorkspaceLeaf } from 'obsidian';
 import { EventBus } from './events.ts';
 import { appendRow, formatRow, parseRecords, removeRows } from './record.ts';
-import { buildIndex, todayString } from './store.ts';
+import {
+  addDays,
+  appendReviewRow,
+  formatReviewRow,
+  nextRound,
+  parseReviewRecords,
+  removeReviewRows,
+  REVIEW_SECTION_TITLE,
+  type ReviewBook,
+} from './review.ts';
+import { ReviewSuggest, pickDays } from './review-suggest.ts';
+import { buildIndex, emptyReviewBook, todayString } from './store.ts';
 import type { BuiltIndex, RawNote, Task } from './types.ts';
-import { applyStatus, listDiaryFiles, openTask, readNotes, readRecord, writeRecord } from './vault-io.ts';
+import {
+  appendToNoteSection,
+  applyStatus,
+  listDiaryFiles,
+  markCurrentLine,
+  openTask,
+  readNotes,
+  readRecord,
+  readReviewRecord,
+  writeRecord,
+  writeReviewRecord,
+} from './vault-io.ts';
 import { TaskPanelView, VIEW_TYPE } from './view.ts';
 
 /** 文件内容缓存，按修改时间失效，避免每次刷新都全量重读 */
@@ -19,6 +41,7 @@ interface CacheEntry {
 export default class TasksManagerPlugin extends Plugin {
   index: BuiltIndex | null = null;
   bus = new EventBus();
+  reviewBook: ReviewBook = emptyReviewBook();
 
   private cache = new Map<string, CacheEntry>();
   private refreshTimer: number | null = null;
@@ -42,6 +65,24 @@ export default class TasksManagerPlugin extends Plugin {
         void this.activateView();
       },
     });
+
+    // 桌面端：把光标所在行标记成待回顾
+    this.addCommand({
+      id: 'mark-review',
+      name: '标记为待回顾',
+      hotkeys: [{ modifiers: ['Ctrl', 'Shift'], key: 'm' }],
+      editorCallback: async (editor) => {
+        const days = await pickDays(this.app, false);
+        if (days <= 0) return;
+        const due = addDays(todayString(), days);
+        if (!markCurrentLine(editor, due)) {
+          new Notice('tasks manager：这一行不能标记（空行或标题）');
+        }
+      },
+    });
+
+    // 两端通用：在编辑器里打 @@ 就地选天数
+    this.registerEditorSuggest(new ReviewSuggest(this.app));
 
     // 笔记变动后重建索引
     this.registerEvent(this.app.vault.on('modify', () => this.scheduleRefresh()));
@@ -129,8 +170,9 @@ export default class TasksManagerPlugin extends Plugin {
         .filter((n): n is RawNote => n !== null);
 
       const records = parseRecords(await readRecord(this.app));
+      this.reviewBook = parseReviewRecords(await readReviewRecord(this.app));
 
-      this.index = buildIndex(notes, records, today);
+      this.index = buildIndex(notes, records, today, this.reviewBook);
       this.todayNoteExists = files.some((f) => f.name === `${today}.md`);
 
       this.bus.emit('index-updated');
@@ -151,6 +193,14 @@ export default class TasksManagerPlugin extends Plugin {
 
   /** 勾掉 / 取消勾选 */
   async toggleTask(task: Task): Promise<void> {
+    // 回顾项走另一条路：写回顾记录 + 当天日记留痕
+    if (task.reviewDue) {
+      if (task.status === 'todo') await this.completeReview(task);
+      else if (task.status === 'done') await this.uncompleteReview(task);
+      await this.refresh();
+      return;
+    }
+
     if (task.status === 'todo') {
       const res = await applyStatus(this.app, task, 'done');
       if (!res.ok) {
@@ -203,6 +253,76 @@ export default class TasksManagerPlugin extends Plugin {
   /** 跳到源笔记的那一行 */
   async openTask(task: Task): Promise<void> {
     await openTask(this.app, task);
+  }
+
+  /** 完成一次回顾：写回顾记录 + 往当天日记的「今日回顾」段留痕 */
+  private async completeReview(task: Task): Promise<void> {
+    const today = todayString();
+
+    // 先问「还要再排吗」，再一次性写完，避免同一篇日记被写两次
+    const days = await pickDays(this.app, true);
+
+    const res = await applyStatus(this.app, task, 'done');
+    if (!res.ok) {
+      new Notice(`tasks manager：${res.reason ?? '勾选失败'}`);
+      return;
+    }
+
+    const learned = this.reviewBook.earliestLearned.get(task.text) ?? task.sourceDate;
+    const round = nextRound(this.reviewBook, task.text);
+
+    // 一、回顾记录
+    try {
+      const content = await readReviewRecord(this.app);
+      await writeReviewRecord(
+        this.app,
+        appendReviewRow(content, formatReviewRow(today, learned, task.text, round)),
+      );
+    } catch (err) {
+      console.error('[tasks manager] 写回顾记录失败', err);
+      new Notice('tasks manager：笔记已勾上，但回顾记录没写进去');
+    }
+
+    // 二、当天日记留痕
+    const lines = [`- 复习：${task.text}（学于 ${learned.slice(5)}）`];
+    if (days > 0) lines.push(`- [ ] ${task.text} @${addDays(today, days)}`);
+    await this.appendToToday(lines);
+  }
+
+  /** 取消勾选：状态还原，回顾记录那一行删掉，日记痕迹保留 */
+  private async uncompleteReview(task: Task): Promise<void> {
+    const res = await applyStatus(this.app, task, 'todo');
+    if (!res.ok) {
+      new Notice(`tasks manager：${res.reason ?? '取消勾选失败'}`);
+      return;
+    }
+
+    try {
+      const content = await readReviewRecord(this.app);
+      const next = removeReviewRows(content, task.doneDate, task.text);
+      if (next !== content) await writeReviewRecord(this.app, next);
+    } catch (err) {
+      console.error('[tasks manager] 删回顾记录失败', err);
+    }
+  }
+
+  /** 往今天的日记追加「今日回顾」段落 */
+  private async appendToToday(lines: string[]): Promise<void> {
+    if (!lines.length) return;
+
+    const today = todayString();
+    const file = this.app.vault.getMarkdownFiles().find((f) => f.name === `${today}.md`);
+    if (!file) {
+      new Notice('tasks manager：今天还没有日记，回顾已记入记录文件');
+      return;
+    }
+
+    try {
+      const res = await appendToNoteSection(this.app, file.path, REVIEW_SECTION_TITLE, lines);
+      if (!res.ok) new Notice(`tasks manager：日记留痕失败（${res.reason ?? '未知原因'}）`);
+    } catch (err) {
+      console.error('[tasks manager] 日记留痕失败', err);
+    }
   }
 
   /** 给外部用的最小查询口，MVP 只暴露未完成列表 */

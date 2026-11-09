@@ -4,6 +4,8 @@
  */
 import { ItemView, Notice, WorkspaceLeaf } from 'obsidian';
 import type TasksManagerPlugin from './main.ts';
+import { shortDate } from './review.ts';
+import { dayDiff, todayString } from './store.ts';
 import type { Task } from './types.ts';
 
 export const VIEW_TYPE = 'tasks-manager-view';
@@ -13,11 +15,12 @@ interface PanelState {
   previous: boolean;
   todayDone: boolean;
   older: boolean;
+  farOverdue: boolean;
 }
 
 export class TaskPanelView extends ItemView {
   private plugin: TasksManagerPlugin;
-  private state: PanelState = { previous: true, todayDone: false, older: false };
+  private state: PanelState = { previous: true, todayDone: false, older: false, farOverdue: false };
 
   constructor(leaf: WorkspaceLeaf, plugin: TasksManagerPlugin) {
     super(leaf);
@@ -53,7 +56,7 @@ export class TaskPanelView extends ItemView {
       return;
     }
 
-    const { today, previous, older, todayDone, oldestDays } = index.groups;
+    const { today, previous, older, todayDone, oldestDays, review } = index.groups;
 
     // —— 今天 ——
     this.section(root, '今天', today.length, null, () => {
@@ -64,6 +67,30 @@ export class TaskPanelView extends ItemView {
       const list = root.createEl('div', { cls: 'tm-list' });
       for (const task of today) this.row(list, task, 'today');
     });
+
+    // —— 待回顾 ——
+    const reviewOpen = review.overdue.length + review.farOverdue.length + review.soon.length;
+    if (reviewOpen > 0) {
+      this.section(root, '待回顾', reviewOpen, null, (body) => {
+        const list = body.createEl('div', { cls: 'tm-list' });
+        for (const task of review.overdue) this.row(list, task, 'review');
+        for (const task of review.soon) this.row(list, task, 'review');
+
+        if (review.farOverdue.length) {
+          const more = body.createEl('details', { cls: 'tm-more' });
+          more.open = this.state.farOverdue;
+          more.addEventListener('toggle', () => {
+            this.state.farOverdue = more.open;
+          });
+          more.createEl('summary', {
+            cls: 'tm-more-head',
+            text: `逾期 30 天以上 ${review.farOverdue.length} 条`,
+          });
+          const farList = more.createEl('div', { cls: 'tm-list' });
+          for (const task of review.farOverdue) this.row(farList, task, 'review');
+        }
+      });
+    }
 
     // —— 之前 ——
     const prevTitle = previous.length ? `之前 · ${previous.length} 条 · 最老 ${oldestDays} 天` : '之前';
@@ -141,7 +168,7 @@ export class TaskPanelView extends ItemView {
   }
 
   /** 画一行待办 */
-  private row(parent: HTMLElement, task: Task, where: 'today' | 'previous' | 'done'): void {
+  private row(parent: HTMLElement, task: Task, where: 'today' | 'previous' | 'done' | 'review'): void {
     const row = parent.createEl('div', { cls: 'tm-row' });
     if (where === 'done') row.addClass('is-done');
 
@@ -164,20 +191,41 @@ export class TaskPanelView extends ItemView {
       void this.plugin.openTask(task);
     });
 
-    // 右侧信息：记于哪天
+    // 右侧信息
     if (where === 'done') {
       const same = task.doneDate === task.sourceDate;
-      const meta = same ? `11 · 当天` : `${task.sourceDate.slice(5)} → ${task.doneDate.slice(5)}`;
+      const meta = same ? '11 · 当天' : `${task.sourceDate.slice(5)} → ${task.doneDate.slice(5)}`;
       row.createEl('span', { cls: 'tm-meta', text: meta });
-    } else if (where === 'previous') {
-      row.createEl('span', { cls: 'tm-meta', text: task.sourceDate.slice(5) });
-      const cancel = row.createEl('button', { cls: 'tm-cancel', text: '×' });
-      cancel.setAttr('aria-label', '划掉');
-      cancel.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        await this.plugin.cancelTask(task);
-      });
+      return;
     }
+
+    if (where === 'review') {
+      const due = task.reviewDue ?? task.sourceDate;
+      const overdueDays = dayDiff(due, todayString());
+      if (overdueDays > 0) {
+        row.addClass('is-overdue');
+        row.createEl('span', { cls: 'tm-meta tm-meta-warn', text: `逾期 ${overdueDays} 天` });
+      } else {
+        row.createEl('span', { cls: 'tm-meta', text: shortDate(due) });
+      }
+      this.cancelButton(row, task);
+      return;
+    }
+
+    if (where === 'previous') {
+      row.createEl('span', { cls: 'tm-meta', text: task.sourceDate.slice(5) });
+      this.cancelButton(row, task);
+    }
+  }
+
+  /** 右侧的划掉按钮 */
+  private cancelButton(row: HTMLElement, task: Task): void {
+    const cancel = row.createEl('button', { cls: 'tm-cancel', text: '×' });
+    cancel.setAttr('aria-label', '划掉');
+    cancel.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await this.plugin.cancelTask(task);
+    });
   }
 
   /** 出错时统一提示 */

@@ -54,6 +54,35 @@ class Notice {
     notices.push(String(msg));
   }
 }
+
+/** 预先排好的天数选择结果，pickDays 会按顺序取 */
+const pickQueue = [];
+
+class SuggestModal {
+  constructor(app) {
+    this.app = app;
+    this.limit = 0;
+  }
+  setPlaceholder() {}
+  setInstructions() {}
+  close() {}
+  onClose() {}
+  open() {
+    const choice = pickQueue.shift();
+    queueMicrotask(() => {
+      if (choice === undefined || choice === 'close') this.onClose();
+      else this.onChooseSuggestion({ days: choice, label: '' });
+    });
+  }
+}
+
+class EditorSuggest {
+  constructor(app) {
+    this.app = app;
+  }
+  close() {}
+}
+
 class Plugin {
   constructor(app, manifest) {
     this.app = app;
@@ -62,9 +91,13 @@ class Plugin {
     this.ribbons = [];
     this.views = [];
     this.events = [];
+    this.suggests = [];
   }
   registerView(type, factory) {
     this.views.push({ type, factory });
+  }
+  registerEditorSuggest(inst) {
+    this.suggests.push(inst);
   }
   addRibbonIcon(icon, title, cb) {
     this.ribbons.push({ icon, title, cb });
@@ -169,7 +202,17 @@ const sandbox = {
   exports: {},
   require(id) {
     if (id === 'obsidian') {
-      return { Plugin, ItemView, MarkdownView, Notice, TFile, TFolder, WorkspaceLeaf };
+      return {
+        Plugin,
+        ItemView,
+        MarkdownView,
+        Notice,
+        TFile,
+        TFolder,
+        WorkspaceLeaf,
+        SuggestModal,
+        EditorSuggest,
+      };
     }
     throw new Error(`未预期的外部依赖：${id}`);
   },
@@ -210,10 +253,11 @@ await plugin.refresh();
 
 const g = () => plugin.index?.groups;
 check('索引建立成功', !!plugin.index);
-check('今天段 5 条', g()?.today.length === 5, `实际 ${g()?.today.length}`);
+check('今天段 6 条', g()?.today.length === 6, `实际 ${g()?.today.length}`);
 check('之前段 9 条', g()?.previous.length === 9, `实际 ${g()?.previous.length}`);
 check('更早 3 条', g()?.older.length === 3, `实际 ${g()?.older.length}`);
-check('今天已完成 2 条', g()?.todayDone.length === 2, `实际 ${g()?.todayDone.length}`);
+check('待回顾有逾期与未来', (g()?.review.overdue.length ?? 0) === 1 && (g()?.review.soon.length ?? 0) === 1);
+check('今天已完成 3 条', g()?.todayDone.length === 3, `实际 ${g()?.todayDone.length}`);
 
 // —— 跨天还账：勾掉一条 11-03 的待办 ——
 const target = g().previous.find((t) => t.text === '换季衣物整理');
@@ -260,6 +304,50 @@ await plugin.refresh();
 const cancelTarget = g().previous.find((t) => t.text === '学一点修图');
 await plugin.cancelTask(cancelTarget);
 check('划掉写回 [-]', mem.get('记事/2026-11-03.md').includes('- [-] 学一点修图'));
+
+// —— 学习回顾：勾掉今天到期的回顾项，选再排 7 天 ——
+await plugin.refresh();
+const reviewTask = g().today.find((t) => t.reviewDue === '2026-11-07');
+check('今天段里出现回顾项', !!reviewTask);
+
+pickQueue.push(7);
+await plugin.toggleTask(reviewTask);
+
+const getNote1103 = () => mem.get('记事/2026-11-03.md') ?? '';
+const getNote1107 = () => mem.get('记事/2026-11-07.md') ?? '';
+const getReviewLog = () => mem.get('待办溯源/回顾记录.md') ?? '';
+
+check('回顾项在源笔记被勾上',
+  getNote1103().includes('- [x] 认知负荷理论：工作记忆容量有限 @2026-11-07'));
+check('回顾记录新增一行',
+  getReviewLog().includes('| 2026-11-07 | 2026-11-03 | 认知负荷理论：工作记忆容量有限 | 1 |'));
+check('当天日记有留痕行',
+  getNote1107().includes('- 复习：认知负荷理论：工作记忆容量有限（学于 11-03）'));
+check('当天日记有下一轮',
+  getNote1107().includes('- [ ] 认知负荷理论：工作记忆容量有限 @2026-11-14'));
+check('留痕写在「今日回顾」段里', (() => {
+  const text = getNote1107();
+  const head = text.indexOf('### 今日回顾');
+  const trace = text.indexOf('- 复习：认知负荷理论');
+  return head !== -1 && trace > head;
+})());
+check('原有留痕没被覆盖', getNote1107().includes('- 复习：早前的一条（学于 11-01）'));
+
+await plugin.refresh();
+check('回顾项进入今天已完成',
+  g().todayDone.some((t) => t.text === '认知负荷理论：工作记忆容量有限'));
+check('下一轮 7 天后不占今天', !g().today.some((t) => t.reviewDue === '2026-11-14'));
+
+// —— 取消勾选回顾项 ——
+const doneReview = g().todayDone.find((t) => t.text === '认知负荷理论：工作记忆容量有限');
+await plugin.toggleTask(doneReview);
+check('取消勾选还原源笔记',
+  getNote1103().includes('- [ ] 认知负荷理论：工作记忆容量有限 @2026-11-07'));
+check('取消勾选删掉回顾记录', !getReviewLog().includes('认知负荷理论'));
+
+// —— 回顾的入口都注册了 ——
+check('注册了 @@ 触发器', plugin.suggests.length === 1);
+check('注册了标记命令', plugin.commands.some((c) => c.id === 'mark-review'));
 
 // —— 无第三方依赖 ——
 check('运行时只依赖 obsidian', !/require\(\s*["'](?!obsidian)/.test(code));

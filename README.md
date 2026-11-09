@@ -7,7 +7,7 @@
 [English](#english) &nbsp;|&nbsp; [中文](#中文)
 
 [![License](https://img.shields.io/badge/license-MIT-2ea44f?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-4c6ef5?style=flat-square)](https://github.com/Ricardo-SE/obsidian-tasks-manager/releases)
+[![Version](https://img.shields.io/badge/version-0.2.0-4c6ef5?style=flat-square)](https://github.com/Ricardo-SE/obsidian-tasks-manager/releases)
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.4%2B-7C3AED?style=flat-square)](https://obsidian.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square)](https://www.typescriptlang.org/)
 
@@ -60,6 +60,7 @@ npm run build
 | 勾选 | 点左边的方框 |
 | 划掉（放弃） | 点右边的 `×`，写成 `- [-]` |
 | 跳到原文 | 点待办文字本身 |
+| 标记回顾 | 行尾打 `@@`；桌面也可以按 `Ctrl+Shift+M` |
 
 ### 待办的写法
 
@@ -76,12 +77,40 @@ npm run build
 
 没打 `&` 但同一段文本在 3 个以上不同日期出现过，也会自动判为日程。
 
+### 学习回顾
+
+学完一段东西，在日记里写下知识点，行尾打两个 `@`，就地选几天后回顾：
+
+```
+认知负荷理论：工作记忆容量有限@@
+                              └─ 1 / 3 / 7 / 15 / 30 天
+```
+
+选 7 天，那一行会变成：
+
+```markdown
+- [ ] 认知负荷理论：工作记忆容量有限 @2026-11-16
+```
+
+到期当天它出现在「今天」，未来 3 天内到期的出现在「待回顾」，逾期会标红显示欠了几天。
+
+勾掉的时候，插件会做四件事：
+
+1. 把那一行标成 `[x]`
+2. 往 `待办溯源/回顾记录.md` 记一行，含轮次
+3. 往**当天**日记的 `### 今日回顾` 段落追一条留痕，告诉你今天过了哪条
+4. 问你要不要再排一轮，选了就在同一段落下长出新的待回顾项
+
+模板里需要有 `### 今日回顾` 这个段落；没有的话插件会在文件末尾补一个。
+
+手机上同样是打 `@@` —— 不需要离开编辑器，所以没有 ribbon 图标。
+
 ### 设计取舍
 
 - **笔记是唯一真相源。** 插件不持有状态，索引是内存缓存，删了能重建，不参与同步。
 - **零第三方运行时依赖。** 面板用原生 DOM，`main.js` 13KB。
 - **解析层不依赖 Obsidian。** 所以能在 node 里直接跑测试，改规则不怕破坏历史行为。
-- **写入最小化。** 勾选只改 `[ ]`→`[x]`。只有跨天完成的才写一行记录，一条待办最多一行。
+- **写入最小化。** 勾选只改 `[ ]`→`[x]`。只有跨天完成的才写一行记录，一条待办最多一行。唯一的例外是回顾：勾掉时会往当天日记追加一个段落，且只在你主动勾掉时发生。
 
 ### 测试
 
@@ -154,6 +183,27 @@ A trailing `&` marks a recurring/daily item, which never shows up in the "Earlie
 The `&` must be preceded by a space and followed only by whitespace, so `R&D` is safe.
 
 Same text appearing on 3 or more distinct dates is also treated as a daily item automatically.
+
+### Review
+
+After learning something, write it down in your daily note and type two `@` at the end of the line:
+
+```
+Working memory capacity is limited@@
+                              └─ 1 / 3 / 7 / 15 / 30 days
+```
+
+Pick 7 days and the line becomes:
+
+```markdown
+- [ ] Working memory capacity is limited @2026-11-16
+```
+
+It shows up under **Today** on the due date, under **Pending review** within the next 3 days, and in red with the overdue count after that.
+
+Checking it off does four things: flips the line to `[x]`, appends a row to `待办溯源/回顾记录.md`, appends a trace line to today's `### 今日回顾` section, and asks whether to schedule another round.
+
+The `### 今日回顾` heading needs to exist in your daily note — the plugin creates it at the end of the file if missing.
 
 ### Design notes
 
