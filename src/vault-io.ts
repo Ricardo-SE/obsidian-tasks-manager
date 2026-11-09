@@ -225,14 +225,19 @@ export async function appendToNoteSection(
   return { ok: true, created };
 }
 
-/** 把编辑器光标所在行标记成待回顾 */
-export function markCurrentLine(editor: Editor, dueDate: string): boolean {
-  const line = editor.getCursor().line;
+/** 把编辑器某一行标记成待回顾 */
+export function markLineAt(editor: Editor, line: number, dueDate: string): boolean {
+  if (line < 0 || line >= editor.lineCount()) return false;
   const updated = markLineWithDue(editor.getLine(line), dueDate);
   if (!updated) return false;
   editor.setLine(line, updated);
   editor.setCursor({ line, ch: updated.length });
   return true;
+}
+
+/** 把编辑器光标所在行标记成待回顾 */
+export function markCurrentLine(editor: Editor, dueDate: string): boolean {
+  return markLineAt(editor, editor.getCursor().line, dueDate);
 }
 
 /**

@@ -3,7 +3,7 @@
  * 1. ReviewSuggest：编辑器里打 @@ 就地弹天数
  * 2. DayPickerModal：桌面快捷键 / 勾掉后问「还要再排吗」
  */
-import { EditorSuggest, Notice, SuggestModal } from 'obsidian';
+import { EditorSuggest, Modal, Notice } from 'obsidian';
 import type {
   App,
   Editor,
@@ -86,7 +86,7 @@ export class ReviewSuggest extends EditorSuggest<DayOption> {
 }
 
 /** 弹一个天数选择框。选「不再」或直接关掉都会回调 0 */
-export class DayPickerModal extends SuggestModal<DayOption> {
+export class DayPickerModal extends Modal {
   private done = false;
 
   constructor(
@@ -95,29 +95,30 @@ export class DayPickerModal extends SuggestModal<DayOption> {
     private readonly allowNone: boolean,
   ) {
     super(app);
-    this.setPlaceholder('多少天后回顾？');
-    this.limit = 6;
   }
 
-  getSuggestions(query: string): DayOption[] {
-    const all: DayOption[] = REVIEW_DAYS.map((d) => ({ days: d, label: `${d} 天后回顾` }));
-    if (this.allowNone) all.unshift({ days: 0, label: '不再复习' });
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass('tm-day-modal');
+    contentEl.createEl('div', { cls: 'tm-day-title', text: '多少天后回顾？' });
 
-    const q = query.trim();
-    if (!q) return all;
-    return all.filter((o) => o.label.includes(q) || String(o.days) === q);
-  }
+    const list = contentEl.createEl('div', { cls: 'tm-day-list' });
+    const options: DayOption[] = REVIEW_DAYS.map((d) => ({ days: d, label: `${d} 天后回顾` }));
+    if (this.allowNone) options.unshift({ days: 0, label: '不再复习' });
 
-  renderSuggestion(item: DayOption, el: HTMLElement): void {
-    el.setText(item.label);
-  }
-
-  onChooseSuggestion(item: DayOption): void {
-    this.finish(item.days);
+    for (const opt of options) {
+      const btn = list.createEl('button', { cls: 'tm-day-btn', text: opt.label });
+      if (opt.days === 0) btn.addClass('is-none');
+      btn.addEventListener('click', () => {
+        this.finish(opt.days);
+        this.close();
+      });
+    }
   }
 
   onClose(): void {
-    super.onClose();
+    this.contentEl.empty();
     this.finish(0);
   }
 

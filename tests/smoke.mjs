@@ -58,22 +58,71 @@ class Notice {
 /** 预先排好的天数选择结果，pickDays 会按顺序取 */
 const pickQueue = [];
 
-class SuggestModal {
+/** 极简 DOM 替身，只够 Modal 建按钮、记事件 */
+class FakeEl {
+  constructor(tag = 'div') {
+    this.tag = tag;
+    this.cls = '';
+    this.text = '';
+    this.children = [];
+    this.handlers = {};
+  }
+  empty() {
+    this.children = [];
+    return this;
+  }
+  addClass(c) {
+    this.cls = `${this.cls} ${c}`.trim();
+    return this;
+  }
+  createEl(tag, opts = {}) {
+    const el = new FakeEl(tag);
+    if (opts.cls) el.cls = opts.cls;
+    if (opts.text) el.text = opts.text;
+    this.children.push(el);
+    return el;
+  }
+  addEventListener(evt, fn) {
+    this.handlers[evt] = fn;
+  }
+}
+
+function collectButtons(el, out = []) {
+  if (el.tag === 'button') out.push(el);
+  for (const c of el.children) collectButtons(c, out);
+  return out;
+}
+
+/**
+ * Modal 替身：open 时真的走 onOpen 建按钮，再按 pickQueue 里的天数
+ * 找到对应按钮并触发 click —— 这样能验证「点击有没有反应」
+ */
+class Modal {
   constructor(app) {
     this.app = app;
-    this.limit = 0;
+    this.contentEl = new FakeEl();
   }
-  setPlaceholder() {}
-  setInstructions() {}
-  close() {}
-  onClose() {}
   open() {
     const choice = pickQueue.shift();
+    this.contentEl = new FakeEl();
+    this.onOpen?.();
     queueMicrotask(() => {
-      if (choice === undefined || choice === 'close') this.onClose();
-      else this.onChooseSuggestion({ days: choice, label: '' });
+      if (choice === undefined || choice === 'close') {
+        this.onClose?.();
+        return;
+      }
+      const btns = collectButtons(this.contentEl);
+      const hit = btns.find((b) =>
+        choice === 0 ? b.text === '不再复习' : b.text.startsWith(`${choice} `),
+      );
+      if (hit) hit.handlers.click?.();
+      else this.onClose?.();
     });
   }
+  close() {
+    this.onClose?.();
+  }
+  onClose() {}
 }
 
 class EditorSuggest {
@@ -210,7 +259,8 @@ const sandbox = {
         TFile,
         TFolder,
         WorkspaceLeaf,
-        SuggestModal,
+        SuggestModal: Modal,
+        Modal,
         EditorSuggest,
       };
     }
@@ -344,6 +394,43 @@ await plugin.toggleTask(doneReview);
 check('取消勾选还原源笔记',
   getNote1103().includes('- [ ] 认知负荷理论：工作记忆容量有限 @2026-11-07'));
 check('取消勾选删掉回顾记录', !getReviewLog().includes('认知负荷理论'));
+
+// —— 快捷键标记：必须真的点到按钮才生效 ——
+const fakeEditor = {
+  lines: ['认知负荷理论：工作记忆容量有限'],
+  getCursor: () => ({ line: 0, ch: 0 }),
+  lineCount() {
+    return fakeEditor.lines.length;
+  },
+  getLine(i) {
+    return fakeEditor.lines[i];
+  },
+  setLine(i, v) {
+    fakeEditor.lines[i] = v;
+  },
+  setCursor() {},
+};
+
+pickQueue.push(7);
+await plugin.commands.find((c) => c.id === 'mark-review').editorCallback(fakeEditor);
+check(
+  '快捷键标记改的是光标那一行',
+  fakeEditor.lines[0] === '- [ ] 认知负荷理论：工作记忆容量有限 @2026-11-14',
+  fakeEditor.lines[0],
+);
+
+// 关掉弹窗（不选）= 不标记
+const fakeEditor2 = {
+  lines: ['另一条知识'],
+  getCursor: () => ({ line: 0, ch: 0 }),
+  lineCount: () => 1,
+  getLine: () => '另一条知识',
+  setLine() {},
+  setCursor() {},
+};
+pickQueue.push('close');
+await plugin.commands.find((c) => c.id === 'mark-review').editorCallback(fakeEditor2);
+check('关掉弹窗不标记', !fakeEditor2.lines[0].includes('@'));
 
 // —— 回顾的入口都注册了 ——
 check('注册了 @@ 触发器', plugin.suggests.length === 1);

@@ -22,7 +22,7 @@ import {
   appendToNoteSection,
   applyStatus,
   listDiaryFiles,
-  markCurrentLine,
+  markLineAt,
   openTask,
   readNotes,
   readRecord,
@@ -72,10 +72,14 @@ export default class TasksManagerPlugin extends Plugin {
       name: '标记为待回顾',
       hotkeys: [{ modifiers: ['Ctrl', 'Shift'], key: 'm' }],
       editorCallback: async (editor) => {
+        // 先把行号记下来：弹窗关掉后光标位置可能已经变了
+        const line = editor.getCursor().line;
+
         const days = await pickDays(this.app, false);
         if (days <= 0) return;
+
         const due = addDays(todayString(), days);
-        if (!markCurrentLine(editor, due)) {
+        if (!markLineAt(editor, line, due)) {
           new Notice('tasks manager：这一行不能标记（空行或标题）');
         }
       },

@@ -1,7 +1,7 @@
 {
   "id": "tasks-manager",
   "name": "tasks manager",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "minAppVersion": "1.4.0",
   "description": "从日记里聚合待办，在面板里查看、勾选、划掉",
   "author": "Ricardo",
