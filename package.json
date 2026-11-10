@@ -1,6 +1,6 @@
 {
   "name": "tasks-manager",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Obsidian 插件：把日记里的 checkbox 待办聚合成一个快捷键可唤出的面板",
   "type": "module",
   "author": "Ricardo",

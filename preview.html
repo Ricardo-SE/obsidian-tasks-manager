@@ -282,6 +282,63 @@ body.is-mobile .tm-cancel {
   color: var(--text-faint);
 }
 
+/* ---------- 天数选择弹窗 ---------- */
+
+.tm-day-modal {
+  padding: 2px 0 6px;
+}
+
+.tm-day-title {
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.tm-day-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tm-day-btn {
+  justify-content: flex-start;
+  width: 100%;
+  height: auto;
+  padding: 10px 14px;
+  font-size: 14px;
+  text-align: left;
+}
+
+.tm-day-btn.is-none {
+  margin-top: 4px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: none;
+}
+
+/* 自定义天数那一行 */
+.tm-day-custom {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tm-day-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 14px;
+}
+
+.tm-day-ok {
+  flex: 0 0 auto;
+  height: 34px;
+  padding: 0 16px;
+  font-size: 14px;
+}
+
 .tm-panel { padding: 8px 6px 20px; }
 </style>
 </head>
@@ -328,7 +385,7 @@ body.is-mobile .tm-cancel {
   </div></div>
 </div>
       <div class="tm-sec">
-  <div class="tm-sec-head"><span class="tm-sec-title">待回顾</span><span class="tm-count">3</span></div>
+  <div class="tm-sec-head"><span class="tm-sec-title">待回顾</span><span class="tm-count">7</span></div>
   <div class="tm-list"><div class="tm-row is-overdue" data-state="todo">
     <button class="tm-check" aria-label="勾选"></button>
     <span class="tm-text">间隔重复：复习间隔递增</span>
@@ -340,6 +397,28 @@ body.is-mobile .tm-cancel {
     <span class="tm-meta">11-09</span>
     <button class="tm-cancel" aria-label="划掉">×</button>
   </div></div>
+  <details class="tm-more"><summary class="tm-more-head">之后 4 条</summary>
+     <div class="tm-list"><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">远期的一条</span>
+    <span class="tm-meta">11-20</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">重复知识</span>
+    <span class="tm-meta">11-20</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">重复知识</span>
+    <span class="tm-meta">11-20</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div><div class="tm-row" data-state="todo">
+    <button class="tm-check" aria-label="勾选"></button>
+    <span class="tm-text">重复知识</span>
+    <span class="tm-meta">11-20</span>
+    <button class="tm-cancel" aria-label="划掉">×</button>
+  </div></div></details>
   <details class="tm-more"><summary class="tm-more-head">逾期 30 天以上 1 条</summary>
      <div class="tm-list"><div class="tm-row is-overdue" data-state="todo">
     <button class="tm-check" aria-label="勾选"></button>

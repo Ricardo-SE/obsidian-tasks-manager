@@ -33,7 +33,7 @@ export interface RawNote {
   content: string;
 }
 
-/** 「待回顾」区的三堆 */
+/** 「待回顾」区的四堆 */
 export interface ReviewGroups {
   /** 逾期，但在折叠阈值内 */
   overdue: Task[];
@@ -41,6 +41,8 @@ export interface ReviewGroups {
   farOverdue: Task[];
   /** 未来几天内到期 */
   soon: Task[];
+  /** 到期日在 soon 窗口之外的，折叠起来 */
+  later: Task[];
 }
 
 /** 面板的各段内容 */

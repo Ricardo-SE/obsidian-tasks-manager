@@ -453,6 +453,24 @@ check('取消标记去掉日期', fakeEditor3.lines[0] === '- [ ] 认知负荷�
 check('注册了 @@ 触发器', plugin.suggests.length === 1);
 check('注册了标记命令', plugin.commands.some((c) => c.id === 'mark-review'));
 
+// —— 自定义天数 ——
+const suggest = plugin.suggests[0];
+const fakeCtx = (query, line) => ({
+  query,
+  start: { line: 0, ch: Math.max(0, line.indexOf('@@')) },
+  end: { line: 0, ch: line.length },
+  editor: { getLine: () => line },
+});
+
+const custom = suggest.getSuggestions(fakeCtx('45', '一条知识@@45'));
+check('@@45 给出自定义 45 天', custom.length === 1 && custom[0].days === 45, JSON.stringify(custom));
+
+const preset = suggest.getSuggestions(fakeCtx('7', '一条知识@@7'));
+check('@@7 命中预设', preset.some((o) => o.days === 7), JSON.stringify(preset));
+
+const withDue = suggest.getSuggestions(fakeCtx('', '- [ ] 知识 @2026-11-14@@'));
+check('已有日期时给「取消回顾标记」', withDue.some((o) => o.days === -1));
+
 // —— 无第三方依赖 ——
 check('运行时只依赖 obsidian', !/require\(\s*["'](?!obsidian)/.test(code));
 

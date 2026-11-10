@@ -113,6 +113,10 @@ export function buildIndex(
   const soon = openReview
     .filter((t) => (t.reviewDue as string) > today && (t.reviewDue as string) <= soonLimit)
     .sort((a, b) => ((a.reviewDue as string) < (b.reviewDue as string) ? -1 : 1));
+  // 更远的到期日：不隐藏，折叠起来
+  const later = openReview
+    .filter((t) => (t.reviewDue as string) > soonLimit)
+    .sort((a, b) => ((a.reviewDue as string) < (b.reviewDue as string) ? -1 : 1));
 
   // 之前：更早的、未完成的一次性待办。回顾项永不进这里
   const previousAll = tasks
@@ -129,7 +133,7 @@ export function buildIndex(
 
   const groups: TaskGroups = {
     today: todayList,
-    review: { overdue, farOverdue, soon },
+    review: { overdue, farOverdue, soon, later },
     previous,
     older,
     todayDone,

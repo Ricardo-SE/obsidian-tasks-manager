@@ -78,7 +78,15 @@ const todayHtml = `<div class="tm-sec">
 </div>`;
 
 const reviewTotal =
-  groups.review.overdue.length + groups.review.farOverdue.length + groups.review.soon.length;
+  groups.review.overdue.length +
+  groups.review.farOverdue.length +
+  groups.review.soon.length +
+  groups.review.later.length;
+
+const laterHtml = groups.review.later.length
+  ? `<details class="tm-more"><summary class="tm-more-head">之后 ${groups.review.later.length} 条</summary>
+     <div class="tm-list">${groups.review.later.map((t) => row(t, 'review')).join('')}</div></details>`
+  : '';
 
 const farHtml = groups.review.farOverdue.length
   ? `<details class="tm-more"><summary class="tm-more-head">逾期 30 天以上 ${groups.review.farOverdue.length} 条</summary>
@@ -89,6 +97,7 @@ const reviewHtml = reviewTotal
   ? `<div class="tm-sec">
   <div class="tm-sec-head"><span class="tm-sec-title">待回顾</span><span class="tm-count">${reviewTotal}</span></div>
   <div class="tm-list">${[...groups.review.overdue, ...groups.review.soon].map((t) => row(t, 'review')).join('')}</div>
+  ${laterHtml}
   ${farHtml}
 </div>`
   : '';

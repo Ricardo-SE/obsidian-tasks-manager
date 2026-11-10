@@ -71,10 +71,11 @@ for (const t of today) {
   line(`  [${tag}] ${t.text}`);
 }
 line();
-line(`=== 待回顾：逾期 ${review.overdue.length} · 折叠 ${review.farOverdue.length} · ${'未来'} ${review.soon.length} ===`);
+line(`=== 待回顾：逾期 ${review.overdue.length} · 3天内 ${review.soon.length} · 之后 ${review.later.length} · 逾期30天以上 ${review.farOverdue.length} ===`);
 for (const t of review.overdue) line(`  逾期 ${dayDiff(t.reviewDue, TODAY)} 天  ${t.text}`);
 for (const t of review.soon) line(`  ${t.reviewDue.slice(5)} 到期  ${t.text}`);
 for (const t of review.farOverdue) line(`  逾期 ${dayDiff(t.reviewDue, TODAY)} 天（折叠）  ${t.text}`);
+for (const t of review.later) line(`  ${t.reviewDue.slice(5)} 到期（折叠）  ${t.text}`);
 line();
 line(`=== 之前 ${previous.length} 条 · 最老 ${oldestDays} 天 ===`);
 for (const t of previous) line(`  ${t.sourceDate.slice(5)}  ${t.text}`);
@@ -144,8 +145,12 @@ check('回顾项永不进「之前」', !previous.some((t) => t.reviewDue));
 check('今天到期进「今天」', today.some((t) => t.text === '认知负荷理论：工作记忆容量有限'));
 check('逾期进待回顾', review.overdue.some((t) => t.text === '间隔重复：复习间隔递增'));
 check('未来 3 天内进待回顾', review.soon.some((t) => t.text === '双链笔记：反向链接'));
-check('远期不显示', ![...today, ...review.overdue, ...review.soon, ...previous]
+check('远期进「之后」折叠', review.later.some((t) => t.text === '远期的一条'));
+check('远期不在展开区', ![...today, ...review.overdue, ...review.soon, ...previous]
   .some((t) => t.text === '远期的一条'));
+check('「之后」共 4 条', review.later.length === 4, `实际 ${review.later.length}`);
+check('「之后」按到期日升序',
+  review.later.every((t, i) => i === 0 || review.later[i - 1].reviewDue <= t.reviewDue));
 check('逾期 30 天以上折叠', review.farOverdue.some((t) => t.text === '很老的一条'));
 check('回顾项不被自动判日程',
   byText('重复知识').length === 3 && byText('重复知识').every((t) => !t.isRoutine && !!t.reviewDue));

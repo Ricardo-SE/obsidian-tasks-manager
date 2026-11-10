@@ -22,6 +22,9 @@ export interface DayOption {
   label: string;
 }
 
+/** 自定义天数的上限，防止手滑打成五位数 */
+const MAX_DAYS = 3650;
+
 /** 判断某一行是否在代码块里 */
 function inFence(editor: Editor, line: number): boolean {
   let open = false;
@@ -66,15 +69,22 @@ export class ReviewSuggest extends EditorSuggest<DayOption> {
 
     // 这一行已经有回顾日期时，末尾多给一个「取消」。放最后，避免回车误选
     const prefix = context.editor.getLine(context.start.line).slice(0, context.start.ch);
-    if (extractReviewDue(prefix).due) {
-      all.push({ days: -1, label: '取消回顾标记' });
-    }
+    const removable = !!extractReviewDue(prefix).due;
+    if (removable) all.push({ days: -1, label: '取消回顾标记' });
 
     if (!q) return all;
 
-    const filtered = all.filter((o) => String(o.days) === q || o.label.includes(q));
-    const exact = filtered.find((o) => String(o.days) === q);
-    return exact ? [exact] : filtered;
+    let list = all.filter((o) => o.label.includes(q) || String(o.days) === q);
+
+    // 直接打数字就是自定义天数：@@45
+    if (/^\d+$/.test(q)) {
+      const n = Number(q);
+      if (n > 0 && n <= MAX_DAYS && !list.some((o) => o.days === n)) {
+        list = [{ days: n, label: `${n} 天后回顾` }, ...list];
+      }
+    }
+
+    return list;
   }
 
   renderSuggestion(item: DayOption, el: HTMLElement): void {
@@ -119,18 +129,57 @@ export class DayPickerModal extends Modal {
     contentEl.addClass('tm-day-modal');
     contentEl.createEl('div', { cls: 'tm-day-title', text: '多少天后回顾？' });
 
+    // 预设天数
     const list = contentEl.createEl('div', { cls: 'tm-day-list' });
-    const options: DayOption[] = REVIEW_DAYS.map((d) => ({ days: d, label: `${d} 天后回顾` }));
-    if (this.allowNone) options.unshift({ days: 0, label: '不再复习' });
-    if (this.canRemove) options.push({ days: -1, label: '取消回顾标记' });
-
-    for (const opt of options) {
-      const btn = list.createEl('button', { cls: 'tm-day-btn', text: opt.label });
-      if (opt.days <= 0) btn.addClass('is-none');
+    for (const d of REVIEW_DAYS) {
+      const btn = list.createEl('button', { cls: 'tm-day-btn', text: `${d} 天后回顾` });
       btn.addEventListener('click', () => {
-        this.finish(opt.days);
+        this.finish(d);
         this.close();
       });
+    }
+
+    // 自定义天数
+    const custom = contentEl.createEl('div', { cls: 'tm-day-custom' });
+    const input = custom.createEl('input');
+    input.type = 'text';
+    input.inputMode = 'numeric';
+    input.placeholder = '自定义天数';
+    input.addClass('tm-day-input');
+
+    const submit = () => {
+      const n = Math.round(Number(input.value.trim()));
+      if (!Number.isFinite(n) || n <= 0 || n > MAX_DAYS) {
+        input.focus();
+        return;
+      }
+      this.finish(n);
+      this.close();
+    };
+
+    const ok = custom.createEl('button', { cls: 'tm-day-ok', text: '确定' });
+    ok.addEventListener('click', submit);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submit();
+      }
+    });
+
+    // 次要选项
+    const extras: DayOption[] = [];
+    if (this.allowNone) extras.push({ days: 0, label: '不再复习' });
+    if (this.canRemove) extras.push({ days: -1, label: '取消回顾标记' });
+
+    if (extras.length) {
+      const extraRow = contentEl.createEl('div', { cls: 'tm-day-list' });
+      for (const opt of extras) {
+        const btn = extraRow.createEl('button', { cls: 'tm-day-btn is-none', text: opt.label });
+        btn.addEventListener('click', () => {
+          this.finish(opt.days);
+          this.close();
+        });
+      }
     }
   }
 

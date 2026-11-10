@@ -16,11 +16,18 @@ interface PanelState {
   todayDone: boolean;
   older: boolean;
   farOverdue: boolean;
+  later: boolean;
 }
 
 export class TaskPanelView extends ItemView {
   private plugin: TasksManagerPlugin;
-  private state: PanelState = { previous: true, todayDone: false, older: false, farOverdue: false };
+  private state: PanelState = {
+    previous: true,
+    todayDone: false,
+    older: false,
+    farOverdue: false,
+    later: false,
+  };
 
   constructor(leaf: WorkspaceLeaf, plugin: TasksManagerPlugin) {
     super(leaf);
@@ -69,7 +76,8 @@ export class TaskPanelView extends ItemView {
     });
 
     // —— 待回顾 ——
-    const reviewOpen = review.overdue.length + review.farOverdue.length + review.soon.length;
+    const reviewOpen =
+      review.overdue.length + review.farOverdue.length + review.soon.length + review.later.length;
     this.section(root, '待回顾', reviewOpen, null, (body) => {
       if (!reviewOpen) {
         this.placeholder(body, '还没有标记的回顾项 · 在日记行尾打 @@');
@@ -80,18 +88,19 @@ export class TaskPanelView extends ItemView {
       for (const task of review.overdue) this.row(list, task, 'review');
       for (const task of review.soon) this.row(list, task, 'review');
 
+      // 3 天之后的：折叠起来，不隐藏
+      if (review.later.length) {
+        this.fold(body, `之后 ${review.later.length} 条`, review.later, 'later', 'review');
+      }
+
       if (review.farOverdue.length) {
-        const more = body.createEl('details', { cls: 'tm-more' });
-        more.open = this.state.farOverdue;
-        more.addEventListener('toggle', () => {
-          this.state.farOverdue = more.open;
-        });
-        more.createEl('summary', {
-          cls: 'tm-more-head',
-          text: `逾期 30 天以上 ${review.farOverdue.length} 条`,
-        });
-        const farList = more.createEl('div', { cls: 'tm-list' });
-        for (const task of review.farOverdue) this.row(farList, task, 'review');
+        this.fold(
+          body,
+          `逾期 30 天以上 ${review.farOverdue.length} 条`,
+          review.farOverdue,
+          'farOverdue',
+          'review',
+        );
       }
     });
 
@@ -106,14 +115,7 @@ export class TaskPanelView extends ItemView {
       for (const task of previous) this.row(list, task, 'previous');
 
       if (older.length) {
-        const more = body.createEl('details', { cls: 'tm-more' });
-        more.open = this.state.older;
-        more.addEventListener('toggle', () => {
-          this.state.older = more.open;
-        });
-        more.createEl('summary', { cls: 'tm-more-head', text: `更早 ${older.length} 条` });
-        const olderList = more.createEl('div', { cls: 'tm-list' });
-        for (const task of older) this.row(olderList, task, 'previous');
+        this.fold(body, `更早 ${older.length} 条`, older, 'older', 'previous');
       }
     }, (open) => {
       this.state.previous = open;
@@ -168,6 +170,24 @@ export class TaskPanelView extends ItemView {
 
   private placeholder(parent: HTMLElement, text: string): void {
     parent.createEl('div', { cls: 'tm-empty', text });
+  }
+
+  /** 画一个可折叠的子分组 */
+  private fold(
+    parent: HTMLElement,
+    title: string,
+    tasks: Task[],
+    key: 'older' | 'farOverdue' | 'later',
+    where: 'previous' | 'review',
+  ): void {
+    const more = parent.createEl('details', { cls: 'tm-more' });
+    more.open = this.state[key];
+    more.addEventListener('toggle', () => {
+      this.state[key] = more.open;
+    });
+    more.createEl('summary', { cls: 'tm-more-head', text: title });
+    const list = more.createEl('div', { cls: 'tm-list' });
+    for (const task of tasks) this.row(list, task, where);
   }
 
   /** 画一行待办 */

@@ -249,3 +249,25 @@ body.is-mobile .tm-cancel {
   border: 1px solid var(--background-modifier-border);
   box-shadow: none;
 }
+
+/* 自定义天数那一行 */
+.tm-day-custom {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tm-day-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 14px;
+}
+
+.tm-day-ok {
+  flex: 0 0 auto;
+  height: 34px;
+  padding: 0 16px;
+  font-size: 14px;
+}

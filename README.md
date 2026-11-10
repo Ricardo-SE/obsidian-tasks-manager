@@ -7,7 +7,7 @@
 [English](#english) &nbsp;|&nbsp; [中文](#中文)
 
 [![License](https://img.shields.io/badge/license-MIT-2ea44f?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.2-4c6ef5?style=flat-square)](https://github.com/Ricardo-SE/obsidian-tasks-manager/releases)
+[![Version](https://img.shields.io/badge/version-0.2.3-4c6ef5?style=flat-square)](https://github.com/Ricardo-SE/obsidian-tasks-manager/releases)
 [![Obsidian](https://img.shields.io/badge/Obsidian-1.4%2B-7C3AED?style=flat-square)](https://obsidian.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square)](https://www.typescriptlang.org/)
 
@@ -88,11 +88,13 @@ npm run build
 
 选 7 天，那一行会变成：
 
+> 天数也能自定义：直接打 `@@45`，或者用快捷键弹窗里的输入框。
+
 ```markdown
 - [ ] 认知负荷理论：工作记忆容量有限 @2026-11-16
 ```
 
-到期当天它出现在「今天」，未来 3 天内到期的出现在「待回顾」，逾期会标红显示欠了几天。
+到期当天它出现在「今天」，未来 3 天内到期的展开在「待回顾」，更远的折叠在「之后」里，逾期会标红显示欠了几天。
 
 勾掉的时候，插件会做四件事：
 
